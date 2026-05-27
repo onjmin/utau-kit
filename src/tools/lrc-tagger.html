@@ -1,98 +1,492 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lyric PV Maker Pro Motion Engine A-Z</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LRC 歌詞タイミングエディター</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* スクロールバーのカスタマイズ */
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: rgba(156, 163, 175, 0.1);
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.3);
+      border-radius: 3px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.5);
+    }
+  </style>
 </head>
-<body class="bg-gray-900 text-gray-200 p-4 min-h-screen">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-cyan-500/30">
 
-<div class="max-w-4xl mx-auto bg-gray-100/10 backdrop-blur-md border border-gray-100/20 rounded-xl p-6 shadow-2xl">
-    <h1 class="text-2xl font-bold mb-4">Lyric PV Maker Pro Motion Engine A-Z</h1>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Input Area -->
-        <div class="space-y-4">
-            <label class="block text-sm text-gray-500">歌詞入力 (プリセットキー[TimeStamp]内容)</label>
-            <textarea id="lyricsInput" class="w-full h-80 bg-gray-100/10 border border-gray-100/20 rounded-md p-3 focus:outline-none" spellcheck="false"></textarea>
-            <button onclick="parseLyrics()" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-md transition">解析して同期</button>
-        </div>
-
-        <!-- Timeline List -->
-        <div class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-            <h2 class="text-sm text-gray-500">解析済みタイムライン</h2>
-            <div id="timelineList" class="space-y-2"></div>
-        </div>
+  <!-- ヘッダー -->
+  <header class="border-b border-gray-700 bg-gray-900/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+    <div class="flex items-center space-x-3">
+      <div class="p-2 bg-cyan-600/20 rounded-lg">
+        <i data-lucide="music-4" class="w-6 h-6 text-cyan-400"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-wider">LRC Lyrics Tagger</h1>
+        <p class="text-xs text-gray-500">スペースキーまたはクリックで直感的に歌詞のタイムタグを記録</p>
+      </div>
     </div>
-</div>
+    
+    <!-- クイックヘルプ -->
+    <div class="flex items-center space-x-2 text-xs text-gray-500">
+      <kbd class="px-2 py-1 bg-slate-800 rounded border border-gray-700">Space</kbd>
+      <span>または画面下タップで現在の時間を打鍵</span>
+    </div>
+  </header>
 
-<script>
-    const defaultLyrics = `#【Aメロ】（テーマ：デジタル・バグ・ノイズ）
-V[00:12.10]「ビル」
-V[00:13.27]「闇の中」
-E[00:14.57]「バグ」
-V[00:15.82]「海ダイブ」
-H[00:17.15]君の名前を
-H[00:19.70]ノイズまみれの世界で
-H[00:22.42]冷たい雨のミュートが
-L[00:24.78]僕らは次の行動を
-L[00:27.43]探していた落とし物
-L[00:30.10]飛ばして遠いコード
+  <!-- メインコンテンツ -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <!-- 左ペイン: 入力・設定 (5カラム) -->
+    <div class="lg:col-span-5 flex flex-col space-y-4">
+      
+      <!-- MP3 音源セクション -->
+      <div class="bg-gray-100/10 p-5 rounded-xl border border-gray-700/50 backdrop-blur-sm">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-gray-500 flex items-center gap-2">
+            <i data-lucide="volume-2" class="w-4 h-4"></i> 音声ソース
+          </h2>
+          <span id="audio-status" class="text-xs bg-gray-100/10 px-2.5 py-0.5 rounded-full border border-gray-700/50">デフォルト音源ロード済</span>
+        </div>
+        
+        <!-- オーディオ要素 -->
+        <audio id="audio-player" class="w-full mb-3 focus:outline-none" controls src="https://res.cloudinary.com/dbld5kqtz/video/upload/v1779899642/test_qowds1.mp3"></audio>
+        
+        <!-- カスタムファイルアップロード -->
+        <div class="mt-2">
+          <label class="block text-xs text-gray-500 mb-2">手持ちのMP3を使用する場合はこちらからロード:</label>
+          <div class="relative flex items-center justify-center border border-dashed border-gray-700 rounded-lg p-3 hover:border-cyan-500/50 hover:bg-gray-100/20 transition-all cursor-pointer">
+            <input type="file" id="file-uploader" accept="audio/mp3,audio/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <div class="flex items-center space-x-2 text-xs">
+              <i data-lucide="upload" class="w-4 h-4"></i>
+              <span id="file-name">音声ファイルを選択 (.mp3 など)</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-#【Bメロ】（テーマ：キーボード・システムログ）
-W[00:32.54]空の色が変わり始め
-W[00:37.54]君の思いが響いてくる
-W[00:41.20]震える
+      <!-- 歌詞の入力 -->
+      <div class="bg-gray-100/10 p-5 rounded-xl border border-gray-700/50 flex-1 flex flex-col min-h-[350px]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-gray-500 flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4"></i> 原本歌詞の入力
+          </h2>
+          <button id="reset-lyrics-btn" class="text-xs text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1">
+            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> リセット
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mb-2">「#」で始まるコメント行や空行は打鍵時にスキップされます（最終出力には保持されます）。</p>
+        
+        <textarea id="lyrics-input" class="w-full flex-1 p-3 bg-gray-100/10 border border-gray-700/50 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none resize-none font-mono text-sm scrollbar-thin" placeholder="ここに歌詞を入力してください..."></textarea>
+      </div>
 
-#【サビ】（テーマ：モーショングラフィックス・キレと発光）
-P[00:42.89]心殺して
-F[00:45.40]ブレる画面と「止まらないで」と
-F[00:48.05]願う　楓　消えそうな
-F[00:50.50]都市の夜　消えていくネオン
-M[00:53.15]「一人じゃない」とアクセス
-M[00:55.57]頬を伝う涙拭いてアセンブリ
-M[00:58.29]二人で抜けるこのルート
-S[01:00.85]青い白いロゴ`;
+    </div>
 
-    document.getElementById('lyricsInput').value = defaultLyrics;
+    <!-- 右ペイン: 記録・打鍵シミュレータ (7カラム) -->
+    <div class="lg:col-span-7 flex flex-col space-y-4">
+      
+      <!-- タイミング打鍵コントロール -->
+      <div class="bg-gray-100/10 p-6 rounded-xl border border-gray-700/50 flex flex-col justify-between relative overflow-hidden group">
+        <!-- 背景の発光装飾 -->
+        <div class="absolute -right-20 -top-20 w-40 h-40 bg-cyan-500/5 blur-[80px] rounded-full pointer-events-none"></div>
+        
+        <div>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-sm font-semibold tracking-wide uppercase text-gray-500 flex items-center gap-2">
+              <i data-lucide="play-circle" class="w-4 h-4"></i> タグ付けコントロール
+            </h2>
+            <div class="flex items-center space-x-2">
+              <button id="restart-tagging-btn" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-gray-700 text-xs rounded-md transition-all flex items-center gap-1">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i> 最初から打ち直す
+              </button>
+            </div>
+          </div>
 
+          <!-- 現在アクティブな歌詞と前後 -->
+          <div class="space-y-2 mb-6">
+            <div class="text-xs text-gray-500 font-mono">1つ前の歌詞:</div>
+            <div id="prev-line" class="text-sm text-gray-500 italic truncate h-6 bg-slate-950/20 px-3 py-0.5 rounded border border-transparent">（なし）</div>
+            
+            <div class="text-xs font-bold flex items-center justify-between">
+              <span>現在打鍵する歌詞:</span>
+              <span id="current-line-index" class="text-xs font-mono px-2 py-0.5 bg-gray-100/10 border border-gray-700 rounded-full">0 / 0</span>
+            </div>
+            <div id="current-line" class="text-lg font-bold text-white px-4 py-3 bg-gray-100/10 border border-gray-700/50 rounded-lg shadow-inner flex items-center min-h-[56px] break-all">
+              （歌詞がありません）
+            </div>
+            
+            <div class="text-xs text-gray-500 font-mono">次の歌詞:</div>
+            <div id="next-line" class="text-sm text-gray-500 truncate h-6 bg-slate-950/20 px-3 py-0.5 rounded border border-transparent">（なし）</div>
+          </div>
+        </div>
+
+        <!-- 巨大タップ領域 -->
+        <button id="tap-trigger-btn" class="w-full py-10 bg-gray-100/10 hover:bg-gray-100/20 border border-gray-700/50 hover:border-cyan-500/60 rounded-xl transition-all flex flex-col items-center justify-center gap-2 cursor-pointer focus:outline-none select-none group-active:scale-[0.99] transform">
+          <i data-lucide="fingerprint" class="w-10 h-10 text-cyan-400 animate-pulse"></i>
+          <span class="font-bold text-base">ここをクリック または SPACEキー</span>
+          <span class="text-xs text-gray-500">再生中に押すと、上記の歌詞に現在の再生時間を割り当てます</span>
+        </button>
+      </div>
+
+      <!-- 出力プレビュー・コピー -->
+      <div class="bg-gray-100/10 p-5 rounded-xl border border-gray-700/50 flex-1 flex flex-col min-h-[300px]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-gray-500 flex items-center gap-2">
+            <i data-lucide="terminal" class="w-4 h-4"></i> 出力プレビュー
+          </h2>
+          
+          <div class="flex items-center space-x-2">
+            <!-- コピー成功トースト用 -->
+            <span id="copy-toast" class="text-xs text-green-400 opacity-0 transition-opacity duration-300 font-semibold">コピーしました！</span>
+            <button id="copy-btn" class="px-3 py-1.5 bg-gray-100/10 hover:bg-gray-100/20 border border-gray-700/50 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i> クリップボードにコピー
+            </button>
+          </div>
+        </div>
+
+        <!-- 結果表示エリア -->
+        <pre id="output-area" class="w-full flex-1 p-4 bg-slate-950/60 border border-gray-800 rounded-lg text-slate-300 font-mono text-xs overflow-y-auto max-h-[300px] scrollbar-thin select-all whitespace-pre-wrap leading-relaxed"></pre>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- 開発者クレジット/フッター -->
+  <footer class="border-t border-gray-800 bg-slate-950 px-6 py-4 text-center text-xs text-gray-500">
+    <p>© 2026 LRC Lyrics Tagger. Designed with precision & minimalism.</p>
+  </footer>
+
+  <script>
+    // デフォルトの歌詞文字列
+    const DEFAULT_LYRICS = `#【Aメロ】
+「ビル」
+「闇の中」
+「バグ」
+「海ダイブ」
+君の名前を
+ノイズまみれの世界で
+
+冷たい雨のミュートが
+僕らは次の行動を
+探していた落とし物
+飛ばして遠いコード
+
+#【Bメロ】
+空の色が変わり始め
+君の思いが響いてくる
+震える
+
+#【サビ】
+心殺して
+ブレる画面と「止まらないで」と
+
+願う　楓　消えそうな
+都市の夜　消えていくネオン
+
+「一人じゃない」とアクセス
+頬を伝う涙拭いてアセンブリ
+二人で抜けるこのルート
+青い白いロゴ`;
+
+    // アプリケーションの状態管理
+    let lyricLines = [];       // 解析済みの全行オブジェクト { original: string, isIgnored: boolean, timeTag: string|null, prefix: string|null }
+    let targetIndices = [];    // 打鍵の対象となる行（無視されない行）のインデックスリスト
+    let currentTargetPointer = 0; // targetIndices の現在どこを指しているか
+
+    // DOM要素の取得
+    const audioPlayer = document.getElementById('audio-player');
+    const fileUploader = document.getElementById('file-uploader');
+    const fileNameText = document.getElementById('file-name');
+    const lyricsInput = document.getElementById('lyrics-input');
+    const resetLyricsBtn = document.getElementById('reset-lyrics-btn');
+    
+    const prevLineEl = document.getElementById('prev-line');
+    const currentLineEl = document.getElementById('current-line');
+    const nextLineEl = document.getElementById('next-line');
+    const currentLineIndexEl = document.getElementById('current-line-index');
+    
+    const tapTriggerBtn = document.getElementById('tap-trigger-btn');
+    const restartTaggingBtn = document.getElementById('restart-tagging-btn');
+    const outputArea = document.getElementById('output-area');
+    const copyBtn = document.getElementById('copy-btn');
+    const copyToast = document.getElementById('copy-toast');
+    const audioStatus = document.getElementById('audio-status');
+
+    // 初期化処理
+    window.addEventListener('DOMContentLoaded', () => {
+      // アイコン描画
+      lucide.createIcons();
+      
+      // デフォルト歌詞のセット
+      lyricsInput.value = DEFAULT_LYRICS;
+      
+      // 解析して開始
+      parseLyrics();
+      
+      // イベントリスナーの登録
+      lyricsInput.addEventListener('input', parseLyrics);
+      resetLyricsBtn.addEventListener('click', () => {
+        if(confirm('歌詞をデフォルトにリセットしますか？')){
+          lyricsInput.value = DEFAULT_LYRICS;
+          parseLyrics();
+        }
+      });
+
+      // ファイルアップロードの検知
+      fileUploader.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          fileNameText.textContent = file.name;
+          const objectUrl = URL.createObjectURL(file);
+          audioPlayer.src = objectUrl;
+          audioStatus.textContent = "カスタム音源ロード済";
+          audioStatus.className = "text-xs bg-emerald-950/30 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20";
+        }
+      });
+
+      // タップ＆スペースイベント
+      tapTriggerBtn.addEventListener('click', triggerTag);
+      window.addEventListener('keydown', handleGlobalKeydown);
+
+      // コピーボタン
+      copyBtn.addEventListener('click', copyToClipboard);
+
+      // 最初からやり直すボタン
+      restartTaggingBtn.addEventListener('click', resetProgress);
+    });
+
+    // 歌詞をパースして内部構造化する
     function parseLyrics() {
-        const input = document.getElementById('lyricsInput').value;
-        const list = document.getElementById('timelineList');
-        list.innerHTML = '';
+      const rawText = lyricsInput.value;
+      const rawLines = rawText.split('\n');
+      
+      lyricLines = rawLines.map(line => {
+        const trimmed = line.trim();
+        // コメント（#始まり）または空行は打鍵を「無視」する
+        const isIgnored = trimmed.startsWith('#') || trimmed === '';
+        
+        return {
+          original: line, // 元の空白や改行を含む文字列
+          trimmed: trimmed,
+          isIgnored: isIgnored,
+          timeTag: null,
+          prefix: null // A〜Zのランダムアルファベット
+        };
+      });
 
-        const lines = input.split('\n');
-        lines.forEach(line => {
-            // #で始まる行は完全に無視
-            if (line.trim().startsWith('#') || line.trim() === '') return;
+      // 打鍵対象となる「無視しない行」の配列インデックスを抽出
+      targetIndices = [];
+      lyricLines.forEach((line, idx) => {
+        if (!line.isIgnored) {
+          targetIndices.push(idx);
+        }
+      });
 
-            // #以降をコメントとして除去
-            let cleanLine = line.split('#')[0].trim();
-            
-            // パース用正規表現 (プリセットキー[MM:SS.ms]歌詞)
-            const match = cleanLine.match(/^([A-Z])\[(\d{2}:\d{2}\.\d{2})\](.*)$/);
-            
-            if (match) {
-                const [_, preset, time, text] = match;
-                const div = document.createElement('div');
-                div.className = 'flex items-center justify-between bg-gray-100/5 p-2 rounded text-sm';
-                div.innerHTML = `
-                    <span class="font-mono text-blue-400">${time}</span>
-                    <span class="font-bold text-lg">${preset}</span>
-                    <span class="truncate max-w-[150px]">${text}</span>
-                    <div class="flex space-x-1">
-                        <button class="px-1 hover:bg-gray-100/20 rounded">-0.5s</button>
-                        <button class="px-1 hover:bg-gray-100/20 rounded">+0.5s</button>
-                    </div>
-                `;
-                list.appendChild(div);
-            }
-        });
+      // ポインターの安全性を担保
+      if (currentTargetPointer >= targetIndices.length) {
+        currentTargetPointer = Math.max(0, targetIndices.length - 1);
+      }
+
+      updateUI();
     }
 
-    // 初期解析
-    parseLyrics();
-</script>
+    // ランダムな英大文字を1文字返す
+    function getRandomAlphabet() {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      return alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+    }
+
+    // 再生時間を [mm:ss.ff] の形式にする
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      const f = Math.floor((seconds % 1) * 100);
+      
+      const mm = String(m).padStart(2, '0');
+      const ss = String(s).padStart(2, '0');
+      const ff = String(f).padStart(2, '0');
+      
+      return `[${mm}:${ss}.${ff}]`;
+    }
+
+    // キーボードのグローバルイベント
+    function handleGlobalKeydown(e) {
+      // もしフォーカスがテキストエリアやinputにある場合は動作させない
+      if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault(); // ページのスクロールを抑制
+        triggerTag();
+      }
+    }
+
+    // タグ打鍵実行
+    function triggerTag() {
+      if (targetIndices.length === 0) return;
+      if (currentTargetPointer >= targetIndices.length) {
+        // すべて打ち終わっている場合
+        return;
+      }
+
+      // 現在の再生時刻を取得
+      const currentTime = audioPlayer.currentTime;
+      const formatted = formatTime(currentTime);
+
+      // 対象の行にタグを書き込む
+      const targetLineIndex = targetIndices[currentTargetPointer];
+      lyricLines[targetLineIndex].timeTag = formatted;
+      
+      // ランダムなアルファベットのプレフィックス設定（まだ未設定の場合のみ設定する）
+      if (!lyricLines[targetLineIndex].prefix) {
+        lyricLines[targetLineIndex].prefix = getRandomAlphabet();
+      }
+
+      // 次の対象行に進む
+      currentTargetPointer++;
+
+      // UIとプレビューのアップデート
+      updateUI();
+      
+      // タップ演出
+      animateTapButton();
+    }
+
+    // 進捗のリセット
+    function resetProgress() {
+      lyricLines.forEach(line => {
+        line.timeTag = null;
+        line.prefix = null;
+      });
+      currentTargetPointer = 0;
+      updateUI();
+    }
+
+    // タップボタンのアニメーション
+    function animateTapButton() {
+      tapTriggerBtn.classList.remove('bg-gray-100/10');
+      tapTriggerBtn.classList.add('bg-cyan-500/40', 'border-cyan-400');
+      setTimeout(() => {
+        tapTriggerBtn.classList.remove('bg-cyan-500/40', 'border-cyan-400');
+        tapTriggerBtn.classList.add('bg-gray-100/10');
+      }, 150);
+    }
+
+    // 画面表示・プレビューの同期
+    function updateUI() {
+      // 1. 打鍵コントロール領域の文字表示
+      if (targetIndices.length === 0) {
+        prevLineEl.textContent = "（なし）";
+        currentLineEl.textContent = "（歌詞を入力するかロードしてください）";
+        nextLineEl.textContent = "（なし）";
+        currentLineIndexEl.textContent = "0 / 0";
+      } else if (currentTargetPointer >= targetIndices.length) {
+        // すべて打ち終わった状態
+        const lastIdx = targetIndices[targetIndices.length - 1];
+        prevLineEl.textContent = lyricLines[lastIdx].trimmed;
+        currentLineEl.innerHTML = `<span class="text-emerald-400 flex items-center gap-1"><i data-lucide="check-circle" class="w-5 h-5"></i> すべてのタイミング打鍵が完了しました！</span>`;
+        nextLineEl.textContent = "（なし）";
+        currentLineIndexEl.textContent = `${currentTargetPointer} / ${targetIndices.length}`;
+        lucide.createIcons();
+      } else {
+        // 通常打鍵中
+        const curIdx = targetIndices[currentTargetPointer];
+        
+        // 1つ前
+        if (currentTargetPointer > 0) {
+          const prevIdx = targetIndices[currentTargetPointer - 1];
+          const tagInfo = lyricLines[prevIdx].timeTag ? `${lyricLines[prevIdx].prefix}${lyricLines[prevIdx].timeTag} ` : '';
+          prevLineEl.textContent = `${tagInfo}${lyricLines[prevIdx].trimmed}`;
+          prevLineEl.classList.add('text-gray-500');
+        } else {
+          prevLineEl.textContent = "（始点）";
+        }
+
+        // 現在
+        currentLineEl.textContent = lyricLines[curIdx].trimmed;
+
+        // 次
+        if (currentTargetPointer + 1 < targetIndices.length) {
+          const nextIdx = targetIndices[currentTargetPointer + 1];
+          nextLineEl.textContent = lyricLines[nextIdx].trimmed;
+        } else {
+          nextLineEl.textContent = "（終点）";
+        }
+
+        currentLineIndexEl.textContent = `${currentTargetPointer + 1} / ${targetIndices.length}`;
+      }
+
+      // 2. 出力プレビューエリアのレンダリング
+      renderOutput();
+    }
+
+    // 出力プレビューの生成
+    function renderOutput() {
+      let resultText = "";
+      
+      lyricLines.forEach(line => {
+        if (line.isIgnored) {
+          // コメントや空行はそのまま出力
+          resultText += line.original + "\n";
+        } else {
+          if (line.timeTag) {
+            // A[00:01.00]歌詞 のフォーマット
+            resultText += `${line.prefix}${line.timeTag}${line.trimmed}\n`;
+          } else {
+            // まだ打鍵されていない行は元のテキスト
+            resultText += `${line.trimmed}\n`;
+          }
+        }
+      });
+
+      outputArea.textContent = resultText.trim();
+    }
+
+    // クリップボードへコピー
+    function copyToClipboard() {
+      const textToCopy = outputArea.textContent;
+      if (!textToCopy) return;
+
+      // iframe対策のためのレガシーAPIフォールバック
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = textToCopy;
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          // トースト表示
+          copyToast.classList.remove('opacity-0');
+          copyToast.classList.add('opacity-100');
+          setTimeout(() => {
+            copyToast.classList.remove('opacity-100');
+            copyToast.classList.add('opacity-0');
+          }, 2000);
+        } else {
+          console.error('コピーできませんでした。');
+        }
+      } catch (err) {
+        console.error('エラーが発生しました: ', err);
+      } finally {
+        document.body.removeChild(tempTextArea);
+      }
+    }
+  </script>
 </body>
 </html>
