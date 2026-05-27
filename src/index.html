@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MV-Kit | ボカロMV制作ツール集</title>
+  <title>UTAU-Kit | ボカロMV制作ツール集</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -11,7 +11,7 @@
 
   <aside class="w-64 border-r border-gray-700/50 p-4 flex flex-col gap-2">
     <div class="px-2 py-4 mb-4">
-      <h1 class="text-lg font-bold tracking-wider">MV-Kit</h1>
+      <h1 class="text-lg font-bold tracking-wider">UTAU-Kit</h1>
       <p class="text-xs text-gray-500">Vocaloid MV Tools</p>
     </div>
     
@@ -26,7 +26,8 @@
       src="about:blank"
     ></iframe>
   </main>
-<script>
+
+  <script>
     const tools = [
       { id: "lrc", name: "LRC歌詞エディター", file: "tools/lrc-tagger.html" },
       { id: "dot", name: "ドットフェードGIF生成", file: "tools/dot-fade-gif-generator.html" },
@@ -40,9 +41,14 @@
 
     // ツール切り替え関数
     const loadTool = (tool) => {
-      frame.src = tool.file;
+      // キャッシュバスター（タイムスタンプ）を付与
+      const cacheBuster = `?t=${Date.now()}`;
+      frame.src = tool.file + cacheBuster;
       history.pushState(null, "", `?tool=${tool.id}`);
     };
+    
+    // 初回読み込み時にもキャッシュバスターを付与
+    frame.src = defaultTool.file + `?t=${Date.now()}`;
 
     tools.forEach(tool => {
       const btn = document.createElement('button');
@@ -52,7 +58,6 @@
       menu.appendChild(btn);
     });
 
-    // 初期ロード判定
     const params = new URLSearchParams(window.location.search);
     const toolId = params.get('tool');
     const defaultTool = tools.find(t => t.id === toolId) || tools[0];
