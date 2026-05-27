@@ -1,3 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MV-Kit | ボカロMV制作ツール集</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex font-sans antialiased">
+
+  <aside class="w-64 border-r border-gray-700/50 p-4 flex flex-col gap-2">
+    <div class="px-2 py-4 mb-4">
+      <h1 class="text-lg font-bold tracking-wider">MV-Kit</h1>
+      <p class="text-xs text-gray-500">Vocaloid MV Tools</p>
+    </div>
+    
+    <nav id="menu" class="flex flex-col gap-1">
+      </nav>
+  </aside>
+
+  <main class="flex-1 bg-slate-950">
+    <iframe 
+      id="tool-frame" 
+      class="w-full h-full border-none" 
+      src="about:blank"
+    ></iframe>
+  </main>
 <script>
     const tools = [
       { id: "lrc", name: "LRC歌詞エディター", file: "tools/lrc-tagger.html" },
@@ -31,3 +59,5 @@
     
     frame.src = defaultTool.file;
   </script>
+</body>
+</html>
