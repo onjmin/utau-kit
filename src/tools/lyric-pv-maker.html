@@ -368,16 +368,16 @@
     // --- 初期デフォルト歌詞データ (未定義プリセット多目的テスト用) ---
     const defaultLyrics = `#【Aメロ】（テーマ：デジタル・バグ・ノイズ）
 # 前半4行は「ドット・バグ」で統一、後半4行は「有機的なノイズ・波形」で質感を統一
-E[00:12.10]「ビル」
+E[00:11.70]「ビル」
 E[00:13.27]「闇の中」
 E[00:14.57]「バグ」
-E[00:15.82]「海ダイブ」
+E[00:16]「海ダイブ」
 L[00:17.15]君の名前を
 L[00:19.70]ノイズまみれの世界で
-L[00:22.42]冷たい雨のミュートが
-L[00:24.78]僕らは次の行動を
+L[00:22]冷たい雨のミュートが
+L[00:24.58]僕らは次の行動を
 L[00:27.43]探していた落とし物
-L[00:30.10]飛ばして遠いコード
+L[00:29.50]飛ばして遠いcode
 
 #【Bメロ】（テーマ：キーボード・システムログ）
 # 前述の通り、PC画面へのタイピングに完全統一
@@ -391,10 +391,10 @@ P[00:42.89]心殺して
 F[00:45.40]ブレる画面と「止まらないで」と
 L[00:48.05]願う　楓　消えそうな
 L[00:50.50]都市の夜　消えていくネオン
-M[00:53.15]「一人じゃない」とアクセス
-L[00:55.57]頬を伝う涙拭いてアセンブリ
+M[00:53.15]「一人じゃない」とAccess
+L[00:55.57]頬を伝う涙拭いてAssembly
 M[00:58.29]二人で抜けるこのルート
-L[01:00.85]青い白いロゴ `;
+L[01:00.85]青い白いロゴ`;
 
     // --- 各種状態パラメータ ---
     let lyricsText = defaultLyrics;
@@ -1553,9 +1553,10 @@ L[01:00.85]青い白いロゴ `;
         }
 
         // --- 7. 実用・インターフェース系 (W〜Z) ---
-        case 'W': { // Constant Terminal (等速カーソル)
+      case 'W': { // Constant Terminal (等速カーソル)
           ctx.font = "bold 54px monospace";
-          ctx.textAlign = 'center';
+          // 1. 左揃えに変更
+          ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
 
           let renderText = '';
@@ -1565,16 +1566,20 @@ L[01:00.85]青い白いロゴ `;
             }
           });
 
+          // 2. 表示開始位置を指定（例：左端から一定の余白を設ける場合）
+          const startX = 50; 
+          
           ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
-          ctx.fillText(renderText, centerX, centerY);
+          ctx.fillText(renderText, startX, centerY);
 
           if (Math.floor(performance.now() / 250) % 2 === 0 && timeLeft >= 0.2) {
+            // 3. カーソル位置を計算（左端からの位置 + 文字列幅）
             const textWidth = ctx.measureText(renderText).width;
-            ctx.fillText('│', centerX + textWidth/2 + 10, centerY);
+            ctx.fillText('│', startX + textWidth - 20, centerY);
           }
           break;
         }
-
+        
         case 'X': { // Morse Flicker (不規則点滅)
           ctx.font = "bold 68px sans-serif";
           ctx.textAlign = 'center';

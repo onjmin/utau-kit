@@ -1,4 +1,4 @@
-# mv-kit
+# utau-kit
 ボカロMV制作のためのWebツール集。
 
 ## READMEについて
