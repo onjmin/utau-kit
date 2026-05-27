@@ -47,6 +47,10 @@
       history.pushState(null, "", `?tool=${tool.id}`);
     };
     
+    const params = new URLSearchParams(window.location.search);
+    const toolId = params.get('tool');
+    const defaultTool = tools.find(t => t.id === toolId) || tools[0];
+    
     // 初回読み込み時にもキャッシュバスターを付与
     frame.src = defaultTool.file + `?t=${Date.now()}`;
 
@@ -57,10 +61,6 @@
       btn.onclick = () => loadTool(tool);
       menu.appendChild(btn);
     });
-
-    const params = new URLSearchParams(window.location.search);
-    const toolId = params.get('tool');
-    const defaultTool = tools.find(t => t.id === toolId) || tools[0];
     
     frame.src = defaultTool.file;
   </script>
