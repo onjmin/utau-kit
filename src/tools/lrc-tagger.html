@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lyric PV Maker Pro Motion Engine A-Z</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-200 p-4 min-h-screen">
+
+<div class="max-w-4xl mx-auto bg-gray-100/10 backdrop-blur-md border border-gray-100/20 rounded-xl p-6 shadow-2xl">
+    <h1 class="text-2xl font-bold mb-4">Lyric PV Maker Pro Motion Engine A-Z</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Input Area -->
+        <div class="space-y-4">
+            <label class="block text-sm text-gray-500">歌詞入力 (プリセットキー[TimeStamp]内容)</label>
+            <textarea id="lyricsInput" class="w-full h-80 bg-gray-100/10 border border-gray-100/20 rounded-md p-3 focus:outline-none" spellcheck="false"></textarea>
+            <button onclick="parseLyrics()" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-md transition">解析して同期</button>
+        </div>
+
+        <!-- Timeline List -->
+        <div class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+            <h2 class="text-sm text-gray-500">解析済みタイムライン</h2>
+            <div id="timelineList" class="space-y-2"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const defaultLyrics = `#【Aメロ】（テーマ：デジタル・バグ・ノイズ）
+V[00:12.10]「ビル」
+V[00:13.27]「闇の中」
+E[00:14.57]「バグ」
+V[00:15.82]「海ダイブ」
+H[00:17.15]君の名前を
+H[00:19.70]ノイズまみれの世界で
+H[00:22.42]冷たい雨のミュートが
+L[00:24.78]僕らは次の行動を
+L[00:27.43]探していた落とし物
+L[00:30.10]飛ばして遠いコード
+
+#【Bメロ】（テーマ：キーボード・システムログ）
+W[00:32.54]空の色が変わり始め
+W[00:37.54]君の思いが響いてくる
+W[00:41.20]震える
+
+#【サビ】（テーマ：モーショングラフィックス・キレと発光）
+P[00:42.89]心殺して
+F[00:45.40]ブレる画面と「止まらないで」と
+F[00:48.05]願う　楓　消えそうな
+F[00:50.50]都市の夜　消えていくネオン
+M[00:53.15]「一人じゃない」とアクセス
+M[00:55.57]頬を伝う涙拭いてアセンブリ
+M[00:58.29]二人で抜けるこのルート
+S[01:00.85]青い白いロゴ`;
+
+    document.getElementById('lyricsInput').value = defaultLyrics;
+
+    function parseLyrics() {
+        const input = document.getElementById('lyricsInput').value;
+        const list = document.getElementById('timelineList');
+        list.innerHTML = '';
+
+        const lines = input.split('\n');
+        lines.forEach(line => {
+            // #で始まる行は完全に無視
+            if (line.trim().startsWith('#') || line.trim() === '') return;
+
+            // #以降をコメントとして除去
+            let cleanLine = line.split('#')[0].trim();
+            
+            // パース用正規表現 (プリセットキー[MM:SS.ms]歌詞)
+            const match = cleanLine.match(/^([A-Z])\[(\d{2}:\d{2}\.\d{2})\](.*)$/);
+            
+            if (match) {
+                const [_, preset, time, text] = match;
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between bg-gray-100/5 p-2 rounded text-sm';
+                div.innerHTML = `
+                    <span class="font-mono text-blue-400">${time}</span>
+                    <span class="font-bold text-lg">${preset}</span>
+                    <span class="truncate max-w-[150px]">${text}</span>
+                    <div class="flex space-x-1">
+                        <button class="px-1 hover:bg-gray-100/20 rounded">-0.5s</button>
+                        <button class="px-1 hover:bg-gray-100/20 rounded">+0.5s</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            }
+        });
+    }
+
+    // 初期解析
+    parseLyrics();
+</script>
+</body>
+</html>

@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lyric PV Maker</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen font-sans">
+
+  <div id="app" class="p-4 max-w-[1600px] mx-auto space-y-4">
+    <!-- ヘッダー -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-800 pb-4 gap-4">
+      <div>
+        <h1 class="text-2xl font-bold flex items-center gap-2 text-white">
+          <i data-lucide="video" class="text-blue-500"></i> Lyric PV Maker <span class="text-xs bg-blue-600/30 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">Pro Motion Engine A-Z</span>
+        </h1>
+        <p class="text-sm text-gray-500">AviUtlの人気演出を高精度に再現。録画ツール（OBS等）でのキャプチャ用透過・BB出力対応</p>
+      </div>
+      
+      <!-- グローバル設定 -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="bg-gray-100/10 p-1 rounded-md border border-gray-800 flex items-center gap-1">
+          <span class="text-xs text-gray-500 px-2 font-medium">背景色(キャプチャ用):</span>
+          <button id="btn-bg-blue" onclick="setBgMode('blue')" class="text-xs px-2.5 py-1 rounded transition-colors font-medium bg-blue-600 text-white">BB (青)</button>
+          <button id="btn-bg-green" onclick="setBgMode('green')" class="text-xs px-2.5 py-1 rounded transition-colors font-medium hover:bg-gray-100/20">GB (緑)</button>
+          <button id="btn-bg-trans" onclick="setBgMode('transparent')" class="text-xs px-2.5 py-1 rounded transition-colors font-medium hover:bg-gray-100/20">半透明</button>
+        </div>
+
+        <div class="bg-gray-100/10 p-1 rounded-md border border-gray-800 flex items-center gap-1">
+          <span class="text-xs text-gray-500 px-2 font-medium">解像度:</span>
+          <select id="resolution" onchange="resizeCanvas()" class="bg-transparent text-xs text-white border-none outline-none pr-2 cursor-pointer font-medium">
+            <option value="1920x1080" class="bg-[#0b0f19] text-white">FHD (1920x1080)</option>
+            <option value="1280x720" class="bg-[#0b0f19] text-white" selected>HD (1280x720)</option>
+            <option value="854x480" class="bg-[#0b0f19] text-white">SD (854x480)</option>
+            <option value="1080x1080" class="bg-[#0b0f19] text-white">1:1 正方形 (1080x1080)</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+      
+      <!-- 左：エディタ＆操作エリア -->
+      <div class="xl:col-span-5 flex flex-col gap-4">
+        
+        <!-- 歌詞エディタ -->
+        <div class="bg-gray-100/10 rounded-md border border-gray-800 p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold flex items-center gap-2 text-white">
+              <i data-lucide="file-text" class="text-blue-400"></i> 歌詞入力 & タイムスタンプ
+            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500">挿入プリセット:</span>
+              <select id="insert-preset" class="bg-gray-100/10 text-xs text-white border border-gray-800 rounded px-2 py-0.5 outline-none font-bold">
+                <option value="A" class="bg-[#0b0f19]">A (Delay Slide)</option>
+                <option value="B" class="bg-[#0b0f19]">B (Horizontal Squash)</option>
+                <option value="C" class="bg-[#0b0f19]">C (Vertical Drop)</option>
+                <option value="E" class="bg-[#0b0f19]">E (Chromatic Typewriter)</option>
+                <option value="I" class="bg-[#0b0f19]">I (Parts Converge)</option>
+                <option value="M" class="bg-[#0b0f19]">M (3D Layer Spin)</option>
+                <option value="Q" class="bg-[#0b0f19]">Q (4-Color Gradient)</option>
+                <option value="T" class="bg-[#0b0f19]">T (Orbit Particle)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="text-[11px] text-gray-500 bg-black/40 p-2 rounded leading-relaxed border border-gray-900">
+            <strong>【使い方】</strong> 音声を再生し、任意の行にカーソルを置いて <kbd class="px-1 bg-gray-800 rounded text-gray-300 font-mono">Ctrl + Space</kbd> または下の <strong>[現在時間にスタンプ]</strong> を押すと、再生中の時間が自動挿入されます！<br>
+            ※ <span class="text-blue-400 font-semibold"># から始まる行</span> および <span class="text-blue-400 font-semibold">空行</span> は、映像解析時には自動で完全に無視されます。<br>
+            ※ 対応外のアルファベット（Y, Z, Jなど今回の改修で再定義されたA〜Zすべて）も、完全に内部エンジンがパースし、最適な演出が再生されます。
+          </div>
+
+          <textarea id="lyric-text" oninput="parseLyrics()" class="w-full h-[320px] bg-gray-100/10 text-white border border-gray-800 rounded-md p-3 font-mono text-sm focus:outline-none focus:border-blue-500 leading-relaxed placeholder-gray-500" placeholder="ここに歌詞を記述してください..."></textarea>
+          
+          <div class="flex gap-2">
+            <button onclick="insertTimestampAtCursor()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs py-2 px-3 rounded flex items-center justify-center gap-1.5 transition-colors">
+              <i data-lucide="clock" class="w-3.5 h-3.5"></i> 現在時間にスタンプ (Ctrl+Space)
+            </button>
+            <button onclick="resetToDefaultLyrics()" class="bg-gray-100/10 hover:bg-gray-100/20 text-xs text-white py-2 px-3 rounded transition-colors" title="デフォルト歌詞に戻す">
+              初期化
+            </button>
+          </div>
+        </div>
+
+        <!-- 音声ファイル同期 -->
+        <div class="bg-gray-100/10 rounded-md border border-gray-800 p-4 flex flex-col gap-3">
+          <span class="text-sm font-bold flex items-center gap-2 text-white">
+            <i data-lucide="music" class="text-blue-400"></i> 同期用オーディオ設定
+          </span>
+          <div class="flex items-center gap-2">
+            <input type="file" id="audio-file" accept="audio/*" onchange="loadAudio(event)" class="hidden">
+            <button onclick="document.getElementById('audio-file').click()" class="bg-gray-100/10 hover:bg-gray-100/20 border border-gray-800 text-xs text-white py-2 px-3 rounded flex items-center gap-1.5 transition-colors">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i> 別ファイルを選択
+            </button>
+            <span id="audio-name" class="text-xs text-gray-500 truncate max-w-[240px]">テスト音源読込中... (test_qowds1.mp3)</span>
+          </div>
+          <audio id="audio-player" class="hidden" ontimeupdate="onAudioTimeUpdate()" src="https://res.cloudinary.com/dbld5kqtz/video/upload/v1779899642/test_qowds1.mp3" crossorigin="anonymous" onerror="onAudioLoadError()"></audio>
+        </div>
+
+      </div>
+
+      <!-- 右：Canvasプレビュー＆タイムライン操作 -->
+      <div class="xl:col-span-7 flex flex-col gap-4">
+        
+        <!-- Canvas プレビュー -->
+        <div class="bg-gray-100/10 rounded-md border border-gray-800 p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold flex items-center gap-2 text-white">
+              <i data-lucide="eye" class="text-blue-400"></i> プレビュー出力
+            </span>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              <span class="text-gray-500 font-medium">この画面をそのままキャプチャソフト等で録画可能です</span>
+            </div>
+          </div>
+
+          <!-- キャンバス本体 (コンテナ内でアス比維持して縮小表示) -->
+          <div class="w-full flex justify-center bg-black/60 rounded border border-gray-950 overflow-hidden relative" style="aspect-ratio: 16/9;">
+            <canvas id="preview-canvas" width="1280" height="720" class="max-w-full max-h-full object-contain"></canvas>
+            
+            <!-- 再生中インジケータ（オーバーレイ） -->
+            <div id="play-indicator" class="absolute top-3 left-3 bg-black/70 px-2.5 py-1 rounded text-[10px] font-mono flex items-center gap-1.5 text-gray-300">
+              <span class="w-2 h-2 rounded-full bg-green-500"></span> IDLE
+            </div>
+          </div>
+
+          <!-- シークバー・コントローラー -->
+          <div class="space-y-2 mt-1">
+            <div class="flex items-center gap-3">
+              <!-- 再生/一時停止ボタン -->
+              <button id="btn-play" onclick="togglePlay()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 transition-colors focus:outline-none">
+                <i data-lucide="play" id="icon-play" class="w-5 h-5"></i>
+              </button>
+              
+              <!-- 停止ボタン -->
+              <button onclick="stopPlayback()" class="bg-gray-100/10 hover:bg-gray-100/20 rounded-full p-3 transition-colors text-slate-300">
+                <i data-lucide="square" class="w-5 h-5"></i>
+              </button>
+
+              <div class="flex-1 flex items-center gap-2">
+                <span id="current-time-text" class="text-xs text-white font-mono font-bold w-12 text-right">00:00.00</span>
+                <input type="range" id="seek-slider" min="0" max="120" step="0.01" value="0" oninput="onSeekSlider(event)" class="flex-1 accent-blue-600 h-1.5 bg-gray-800 rounded-lg cursor-pointer">
+                <span id="total-time-text" class="text-xs text-gray-500 font-mono w-12">02:00.00</span>
+              </div>
+            </div>
+
+            <!-- 時間制御アシスト -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-900 text-xs">
+              <div class="flex items-center gap-1 text-white">
+                <button onclick="adjustOffset(-0.5)" class="px-2 py-1 bg-gray-100/10 hover:bg-gray-100/20 rounded text-[11px] text-white">-0.5s</button>
+                <button onclick="adjustOffset(-0.1)" class="px-2 py-1 bg-gray-100/10 hover:bg-gray-100/20 rounded text-[11px] text-white">-0.1s</button>
+                <span class="text-gray-500 font-mono mx-1">微調整</span>
+                <button onclick="adjustOffset(0.1)" class="px-2 py-1 bg-gray-100/10 hover:bg-gray-100/20 rounded text-[11px] text-white">+0.1s</button>
+                <button onclick="adjustOffset(0.5)" class="px-2 py-1 bg-gray-100/10 hover:bg-gray-100/20 rounded text-[11px] text-white">+0.5s</button>
+              </div>
+              <div class="text-[11px] text-gray-500 font-medium">
+                <span class="text-gray-300"><kbd class="px-1 bg-gray-800 rounded">Space</kbd></span>: 再生/停止
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- アコーディオン式 演出プリセット一覧 -->
+        <div class="bg-gray-100/10 rounded-md border border-gray-800 p-4 flex flex-col gap-3">
+          <span class="text-sm font-bold flex items-center gap-2 text-white">
+            <i data-lucide="layers" class="text-blue-400"></i> A〜Z カテゴリ別演出ガイド（クリックで開閉）
+          </span>
+          <div class="space-y-2">
+            
+            <!-- カテゴリ1 -->
+            <div class="border border-gray-100/20 rounded-md overflow-hidden">
+              <button onclick="toggleAccordion('cat-1')" class="w-full bg-gray-100/10 hover:bg-gray-100/20 px-3 py-2 text-xs font-semibold flex justify-between items-center transition-colors text-white">
+                <span>📦 1. 緩急・スライド系（王道の動き・リサイズ）</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+              </button>
+              <ul id="cat-1" class="divide-y divide-gray-100/10 px-3 py-1 bg-gray-100/10 hidden">
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-blue-400 mr-2 bg-gray-100/10 px-1.5 rounded">A</span>
+                  <div><strong class="block">Delay Slide</strong><span class="text-gray-500">1文字ずつ下からスライド、到達時にぼよよんと減衰バウンド。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-blue-400 mr-2 bg-gray-100/10 px-1.5 rounded">B</span>
+                  <div><strong class="block">Horizontal Squash</strong><span class="text-gray-500">高速横移動。速度に応じて文字が横に伸び、定位置で等倍に締まる。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-blue-400 mr-2 bg-gray-100/10 px-1.5 rounded">C</span>
+                  <div><strong class="block">Vertical Drop</strong><span class="text-gray-500">上空から高速落下、ベースライン衝突時にグシャッと潰れて復元。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-blue-400 mr-2 bg-gray-100/10 px-1.5 rounded">D</span>
+                  <div><strong class="block">Roll Jump</strong><span class="text-gray-500">Z軸方向に高速ロール回転しながら弧を描いてポップに入場。</span></div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- カテゴリ2 -->
+            <div class="border border-gray-100/20 rounded-md overflow-hidden">
+              <button onclick="toggleAccordion('cat-2')" class="w-full bg-gray-100/10 hover:bg-gray-100/20 px-3 py-2 text-xs font-semibold flex justify-between items-center transition-colors text-white">
+                <span>⚡ 2. 歪み・グリッチ系（サイバー・ノイズ）</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+              </button>
+              <ul id="cat-2" class="divide-y divide-gray-100/10 px-3 py-1 bg-gray-100/10 hidden">
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-red-400 mr-2 bg-gray-100/10 px-1.5 rounded">E</span>
+                  <div><strong class="block">Chromatic Typewriter</strong><span class="text-gray-500">タイピング出現時、一瞬だけRGB色収差と激しい横揺れラスターが走る。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-red-400 mr-2 bg-gray-100/10 px-1.5 rounded">F</span>
+                  <div><strong class="block">Inversion Flash</strong><span class="text-gray-500">最初の1〜2フレームのみ高コントラスト白黒反転ストロボを照射。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-red-400 mr-2 bg-gray-100/10 px-1.5 rounded">G</span>
+                  <div><strong class="block">Liquid Raster</strong><span class="text-gray-500">表示中、常に低い周波数のサイン波で水面のように優雅にゆらぎ続ける。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-red-400 mr-2 bg-gray-100/10 px-1.5 rounded">H</span>
+                  <div><strong class="block">Turbulent Noise</strong><span class="text-gray-500">有機的ノイズによるゆがみが文字の境界を常に揺らし続ける不穏演出。</span></div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- カテゴリ3 -->
+            <div class="border border-gray-100/20 rounded-md overflow-hidden">
+              <button onclick="toggleAccordion('cat-3')" class="w-full bg-gray-100/10 hover:bg-gray-100/20 px-3 py-2 text-xs font-semibold flex justify-between items-center transition-colors text-white">
+                <span>✂️ 3. クリッピング・幾何学系（スマート・スライス）</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+              </button>
+              <ul id="cat-3" class="divide-y divide-gray-100/10 px-3 py-1 bg-gray-100/10 hidden">
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-purple-400 mr-2 bg-gray-100/10 px-1.5 rounded">I</span>
+                  <div><strong class="block">Parts Converge</strong><span class="text-gray-500">斜め45度カット。左右遠くからEase-Out Sharpで合体。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-purple-400 mr-2 bg-gray-100/10 px-1.5 rounded">J</span>
+                  <div><strong class="block">Grid Wipe</strong><span class="text-gray-500">チェス盤状スライス。各グリッドがスピン・スライドして１本の文字に。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-purple-400 mr-2 bg-gray-100/10 px-1.5 rounded">K</span>
+                  <div><strong class="block">Stripe Slash</strong><span class="text-gray-500">微細なストライプクリップ。奇数行・偶数行が左右からすれ違い合体。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-purple-400 mr-2 bg-gray-100/10 px-1.5 rounded">L</span>
+                  <div><strong class="block">Wave Reveal</strong><span class="text-gray-500">オーディオ波形マスクに沿って左から右へ流れるように出現。</span></div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- カテゴリ4 -->
+            <div class="border border-gray-100/20 rounded-md overflow-hidden">
+              <button onclick="toggleAccordion('cat-4')" class="w-full bg-gray-100/10 hover:bg-gray-100/20 px-3 py-2 text-xs font-semibold flex justify-between items-center transition-colors text-white">
+                <span>🌀 4. 回転・立体表現系（奥行き・空間）</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+              </button>
+              <ul id="cat-4" class="divide-y divide-gray-100/10 px-3 py-1 bg-gray-100/10 hidden">
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-cyan-400 mr-2 bg-gray-100/10 px-1.5 rounded">M</span>
+                  <div><strong class="block">3D Layer Spin</strong><span class="text-gray-500">奥行きZをずらし、擬似3D空間でダイナミックにY軸回転入場。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-cyan-400 mr-2 bg-gray-100/10 px-1.5 rounded">N</span>
+                  <div><strong class="block">Ghost Ripple</strong><span class="text-gray-500">高速移動中、半透明のゴースト残像を元の位置に置き去り収束。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-cyan-400 mr-2 bg-gray-100/10 px-1.5 rounded">O</span>
+                  <div><strong class="block">Text Wave</strong><span class="text-gray-500">出現と同時に、文字のストローク（輪郭）が波紋のように広がりフェード。</span></div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- カテゴリ5 -->
+            <div class="border border-gray-100/20 rounded-md overflow-hidden">
+              <button onclick="toggleAccordion('cat-5')" class="w-full bg-gray-100/10 hover:bg-gray-100/20 px-3 py-2 text-xs font-semibold flex justify-between items-center transition-colors text-white">
+                <span>🎨 5. タイポ・グラフィカル系（装飾・カラー）</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+              </button>
+              <ul id="cat-5" class="divide-y divide-gray-100/10 px-3 py-1 bg-gray-100/10 hidden">
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-yellow-400 mr-2 bg-gray-100/10 px-1.5 rounded">P</span>
+                  <div><strong class="block">Kinetic Edge</strong><span class="text-gray-500">極太アウトラインのみ。巨大300%から100%へ爆速ズームイン。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-yellow-400 mr-2 bg-gray-100/10 px-1.5 rounded">Q</span>
+                  <div><strong class="block">4-Color Gradient</strong><span class="text-gray-500">液体のようになめらかにサイクル変化し続ける高輝度グラデーション。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-yellow-400 mr-2 bg-gray-100/10 px-1.5 rounded">R</span>
+                  <div><strong class="block">Neon Glow</strong><span class="text-gray-500">Canvasの影ぼかしを多重適用した強いネオン管グロス発光。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-yellow-400 mr-2 bg-gray-100/10 px-1.5 rounded">S</span>
+                  <div><strong class="block">Yin-Yang Split</strong><span class="text-gray-500">中央境界を跨ぐと、左なら白・右なら黒へカラーがパキッと反転。</span></div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- カテゴリ6 -->
+            <div class="border border-gray-100/20 rounded-md overflow-hidden">
+              <button onclick="toggleAccordion('cat-6')" class="w-full bg-gray-100/10 hover:bg-gray-100/20 px-3 py-2 text-xs font-semibold flex justify-between items-center transition-colors text-white">
+                <span>🎇 6. 破壊・粒子系（パーティクル）</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+              </button>
+              <ul id="cat-6" class="divide-y divide-gray-100/10 px-3 py-1 bg-gray-100/10 hidden">
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-emerald-400 mr-2 bg-gray-100/10 px-1.5 rounded">T</span>
+                  <div><strong class="block">Orbit Particle</strong><span class="text-gray-500">画面に散らばる粒子がらせんを描きながら高速収束して結像。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-emerald-400 mr-2 bg-gray-100/10 px-1.5 rounded">U</span>
+                  <div><strong class="block">Shatter Reverse</strong><span class="text-gray-500">砕け散った文字パーツが逆再生でカシャカシャと組み上がるSF出現。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-emerald-400 mr-2 bg-gray-100/10 px-1.5 rounded">V</span>
+                  <div><strong class="block">Pixel Dissolve</strong><span class="text-gray-500">レトロゲーム風。1x1のランダムドットが徐々に埋まり結像。</span></div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- カテゴリ7 -->
+            <div class="border border-gray-100/20 rounded-md overflow-hidden">
+              <button onclick="toggleAccordion('cat-7')" class="w-full bg-gray-100/10 hover:bg-gray-100/20 px-3 py-2 text-xs font-semibold flex justify-between items-center transition-colors text-white">
+                <span>⚙️ 7. インターフェース・実用系（タイピング・UI）</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+              </button>
+              <ul id="cat-7" class="divide-y divide-gray-100/10 px-3 py-1 bg-gray-100/10 hidden">
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-gray-300 mr-2 bg-gray-100/10 px-1.5 rounded">W</span>
+                  <div><strong class="block">Constant Terminal</strong><span class="text-gray-500">等速タイピング。末尾でカーソル「│」がチカチカと点滅。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-gray-300 mr-2 bg-gray-100/10 px-1.5 rounded">X</span>
+                  <div><strong class="block">Morse Flicker</strong><span class="text-gray-500">故障した蛍光灯のように不規則なモールス点滅を繰り返して常時点灯。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-gray-300 mr-2 bg-gray-100/10 px-1.5 rounded">Y</span>
+                  <div><strong class="block">Laser Scan</strong><span class="text-gray-500">水平レーザーが上から下へ通過した領域から焼き付くように出現。</span></div>
+                </li>
+                <li class="py-1.5 text-xs flex items-start">
+                  <span class="font-bold text-gray-300 mr-2 bg-gray-100/10 px-1.5 rounded">Z</span>
+                  <div><strong class="block">Zero Gravity</strong><span class="text-gray-500">入場後も常に微細なベクトルによりカメラ手振れのように無限に浮遊。</span></div>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- タイムライン可視化 -->
+        <div class="bg-gray-100/10 rounded-md border border-gray-800 p-4 flex flex-col gap-2">
+          <span class="text-sm font-bold flex items-center gap-2 text-white">
+            <i data-lucide="align-left" class="text-blue-400"></i> 解析完了した有効なタイムスタンプ
+          </span>
+          <div id="timeline-list" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+            <!-- パース結果が動的に挿入されます -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- 初期デフォルト歌詞データ (未定義プリセット多目的テスト用) ---
+    const defaultLyrics = `#【Aメロ】（テーマ：デジタル・バグ・ノイズ）
+# 前半4行は「ドット・バグ」で統一、後半4行は「有機的なノイズ・波形」で質感を統一
+E[00:12.10]「ビル」
+E[00:13.27]「闇の中」
+E[00:14.57]「バグ」
+E[00:15.82]「海ダイブ」
+L[00:17.15]君の名前を
+L[00:19.70]ノイズまみれの世界で
+L[00:22.42]冷たい雨のミュートが
+L[00:24.78]僕らは次の行動を
+L[00:27.43]探していた落とし物
+L[00:30.10]飛ばして遠いコード
+
+#【Bメロ】（テーマ：キーボード・システムログ）
+# 前述の通り、PC画面へのタイピングに完全統一
+W[00:32.54]空の色が変わり始め
+W[00:37.54]君の思いが響いてくる
+W[00:41.20]震える
+
+#【サビ】（テーマ：モーショングラフィックス・キレと発光）
+# 前半は「極太・フラッシュ」で最高潮のキレ、後半は「立体・グラフィカル」でエモさを統一
+P[00:42.89]心殺して
+F[00:45.40]ブレる画面と「止まらないで」と
+L[00:48.05]願う　楓　消えそうな
+L[00:50.50]都市の夜　消えていくネオン
+M[00:53.15]「一人じゃない」とアクセス
+L[00:55.57]頬を伝う涙拭いてアセンブリ
+M[00:58.29]二人で抜けるこのルート
+L[01:00.85]青い白いロゴ `;
+
+    // --- 各種状態パラメータ ---
+    let lyricsText = defaultLyrics;
+    let parsedLines = [];
+    let bgMode = 'blue'; // blue | green | transparent
+    let currentTime = 0;
+    let duration = 120; // 仮想の楽曲時間 (秒)
+    let isPlaying = false;
+    let animationFrameId = null;
+    let lastFrameTime = 0;
+    let isDraggingSlider = false;
+    let isAudioFailed = false; // オーディオの読込失敗フラグ
+
+    // AからZまですべての定義済みプレセット
+    const VALID_PRESETS = [
+      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
+      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+    ];
+
+    // UI要素の取得
+    const canvas = document.getElementById('preview-canvas');
+    const ctx = canvas.getContext('2d');
+    const textarea = document.getElementById('lyric-text');
+    const audioPlayer = document.getElementById('audio-player');
+    const audioName = document.getElementById('audio-name');
+    const playBtn = document.getElementById('btn-play');
+    const playIcon = document.getElementById('icon-play');
+    const seekSlider = document.getElementById('seek-slider');
+    const currentTimeText = document.getElementById('current-time-text');
+    const totalTimeText = document.getElementById('total-time-text');
+    const playIndicator = document.getElementById('play-indicator');
+    const timelineList = document.getElementById('timeline-list');
+    const insertPresetSelect = document.getElementById('insert-preset');
+
+    // 初期化処理
+    window.onload = function() {
+      // 歌詞エリアに初期歌詞をセット
+      textarea.value = defaultLyrics;
+      
+      // アイコンの初期化
+      lucide.createIcons();
+
+      // 各種リサイズとパース
+      resizeCanvas();
+      parseLyrics();
+
+      // 初期音源メタデータのロード監視
+      setupDefaultAudio();
+
+      // 最初の描画
+      draw();
+    };
+
+    // アコーディオン開閉
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.toggle('hidden');
+      }
+    }
+
+    // デフォルトのオーディオ設定
+    function setupDefaultAudio() {
+      if (audioPlayer.src) {
+        audioPlayer.onloadedmetadata = function() {
+          if (!isAudioFailed) {
+            duration = audioPlayer.duration;
+            seekSlider.max = duration;
+            audioName.innerText = "デフォルトテスト音源がロードされました (test_qowds1.mp3)";
+            updateUI();
+            draw();
+          }
+        };
+        // すでにロード済みの際の対策
+        if (audioPlayer.readyState >= 1 && !isAudioFailed) {
+          duration = audioPlayer.duration;
+          seekSlider.max = duration;
+          audioName.innerText = "デフォルトテスト音源を適用済 (test_qowds1.mp3)";
+          updateUI();
+          draw();
+        }
+      }
+    }
+
+    // オーディオ読込失敗時
+    function onAudioLoadError() {
+      isAudioFailed = true;
+      audioName.innerText = "テスト音源は仮想タイマー自走モードで完全に同期します";
+      audioName.classList.add("text-amber-400");
+      audioName.classList.remove("text-gray-500");
+      
+      if (parsedLines.length > 0) {
+        const lastLine = parsedLines[parsedLines.length - 1];
+        duration = Math.max(120, Math.ceil(lastLine.time + lastLine.totalDuration + 5));
+        seekSlider.max = duration;
+      }
+      updateUI();
+    }
+
+    // 背景モードの切替
+    function setBgMode(mode) {
+      bgMode = mode;
+      
+      const buttons = {
+        blue: document.getElementById('btn-bg-blue'),
+        green: document.getElementById('btn-bg-green'),
+        transparent: document.getElementById('btn-bg-trans')
+      };
+
+      Object.keys(buttons).forEach(key => {
+        if (key === mode) {
+          buttons[key].classList.add('bg-blue-600', 'text-white');
+          buttons[key].classList.remove('hover:bg-gray-100/20');
+        } else {
+          buttons[key].classList.remove('bg-blue-600', 'text-white');
+          buttons[key].classList.add('hover:bg-gray-100/20');
+        }
+      });
+
+      draw();
+    }
+
+    // デフォルト歌詞リセット
+    function resetToDefaultLyrics() {
+      if (confirm('歌詞エディタの記述をデフォルト曲データにリセットしますか？')) {
+        textarea.value = defaultLyrics;
+        parseLyrics();
+        currentTime = 0;
+        if (audioPlayer && !isAudioFailed) {
+          audioPlayer.currentTime = 0;
+        }
+        updateUI();
+        draw();
+      }
+    }
+
+    // 解像度変更時にキャンバスのバッファサイズを設定
+    function resizeCanvas() {
+      const resVal = document.getElementById('resolution').value;
+      const [w, h] = resVal.split('x').map(Number);
+      canvas.width = w;
+      canvas.height = h;
+      draw();
+    }
+
+    // タイムスタンプを秒数にパース
+    function parseTimestamp(minStr, secStr, msStr) {
+      const minutes = parseInt(minStr, 10);
+      const seconds = parseInt(secStr, 10);
+      const ms = msStr ? parseInt(msStr.padEnd(3, '0').slice(0, 3), 10) : 0;
+      return minutes * 60 + seconds + ms / 1000;
+    }
+
+    // 歌詞テキストのパース
+    function parseLyrics() {
+      lyricsText = textarea.value;
+      const lines = lyricsText.split('\n');
+      parsedLines = [];
+
+      lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        
+        // コメント、空行スキップ
+        if (trimmed === '' || trimmed.startsWith('#')) {
+          return;
+        }
+
+        const regex = /^([A-Z])?\[(\d+):(\d+)(?:\.(\d+))?\](.*)$/;
+        const match = trimmed.match(regex);
+
+        if (match) {
+          let preset = match[1] || 'A';
+          // A〜Zすべての未定義は A へフォールバック
+          if (!VALID_PRESETS.includes(preset)) {
+            preset = 'A';
+          }
+
+          const time = parseTimestamp(match[2], match[3], match[4]);
+          const rawTextContent = match[5];
+
+          // インライン個別文字遅延パース
+          const chars = [];
+          let currentDelay = 0;
+          const defaultCharDelay = 0.08;
+
+          const inlineRegex = /<(\d+(?:\.\d+)?)>/;
+          let tempText = rawTextContent;
+          let parts = [];
+          
+          while (tempText.includes('<')) {
+            const tagMatch = tempText.match(inlineRegex);
+            if (!tagMatch) break;
+            
+            const before = tempText.slice(0, tagMatch.index);
+            const speed = parseFloat(tagMatch[1]);
+            tempText = tempText.slice(tagMatch.index + tagMatch[0].length);
+            
+            if (before) {
+              parts.push({ text: before, speed: defaultCharDelay });
+            }
+            const nextTagIndex = tempText.indexOf('<');
+            const targetText = nextTagIndex !== -1 ? tempText.slice(0, nextTagIndex) : tempText;
+            if (targetText) {
+              parts.push({ text: targetText, speed: speed });
+              tempText = tempText.slice(targetText.length);
+            }
+          }
+
+          if (tempText) {
+            parts.push({ text: tempText, speed: defaultCharDelay });
+          }
+
+          if (parts.length > 0) {
+            parts.forEach(part => {
+              for (let i = 0; i < part.text.length; i++) {
+                chars.push({
+                  char: part.text[i],
+                  delay: currentDelay
+                });
+                currentDelay += part.speed;
+              }
+            });
+          } else {
+            for (let i = 0; i < rawTextContent.length; i++) {
+              chars.push({
+                char: rawTextContent[i],
+                delay: currentDelay
+              });
+              currentDelay += defaultCharDelay;
+            }
+          }
+
+          parsedLines.push({
+            id: index,
+            preset,
+            time,
+            text: rawTextContent.replace(/<\d+(?:\.\d+)?>/g, ''),
+            chars,
+            totalDuration: currentDelay + 2.5
+          });
+        }
+      });
+
+      // ソート
+      parsedLines.sort((a, b) => a.time - b.time);
+
+      if (parsedLines.length > 0 && (!audioPlayer.src || isAudioFailed)) {
+        const lastLine = parsedLines[parsedLines.length - 1];
+        duration = Math.max(120, Math.ceil(lastLine.time + lastLine.totalDuration + 5));
+        seekSlider.max = duration;
+      }
+
+      updateUI();
+      renderTimelineUI();
+      draw();
+    }
+
+    // タイムラインリスト描画
+    function renderTimelineUI() {
+      timelineList.innerHTML = '';
+      if (parsedLines.length === 0) {
+        timelineList.innerHTML = `<div class="text-xs text-gray-500 py-2 text-center">有効なタイムスタンプ行がありません</div>`;
+        return;
+      }
+
+      parsedLines.forEach(line => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between text-xs bg-black/40 px-3 py-1.5 rounded border border-gray-900 hover:border-gray-700 transition-colors cursor-pointer text-white';
+        item.onclick = () => {
+          seekTo(line.time);
+        };
+
+        const timeStr = formatTime(line.time);
+        item.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-blue-400 font-bold">${timeStr}</span>
+            <span class="font-bold text-[10px] bg-gray-800 text-gray-300 px-1.5 py-0.2 rounded">${line.preset}</span>
+            <span class="text-gray-300 font-medium truncate max-w-[280px]">${line.text}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="event.stopPropagation(); shiftLineTime(${line.id}, -0.5)" class="text-[10px] bg-gray-800 hover:bg-gray-700 px-1 py-0.5 rounded text-gray-400">-0.5s</button>
+            <button onclick="event.stopPropagation(); shiftLineTime(${line.id}, 0.5)" class="text-[10px] bg-gray-800 hover:bg-gray-700 px-1 py-0.5 rounded text-gray-400">+0.5s</button>
+          </div>
+        `;
+        timelineList.appendChild(item);
+      });
+    }
+
+    // タイムスタンプシフト調整
+    function shiftLineTime(lineId, amount) {
+      const lines = textarea.value.split('\n');
+      const targetRegex = /^([A-Z])?\[(\d+):(\d+)(?:\.(\d+))?\]/;
+      
+      if (lines[lineId]) {
+        const trimmed = lines[lineId].trim();
+        const match = trimmed.match(targetRegex);
+        if (match) {
+          const currentT = parseTimestamp(match[2], match[3], match[4]);
+          const newT = Math.max(0, currentT + amount);
+          
+          const min = Math.floor(newT / 60).toString().padStart(2, '0');
+          const sec = Math.floor(newT % 60).toString().padStart(2, '0');
+          const ms = Math.floor((newT % 1) * 100).toString().padStart(2, '0');
+          
+          const presetStr = match[1] || 'A';
+          const newTimestamp = `${presetStr}[${min}:${sec}.${ms}]`;
+          
+          lines[lineId] = lines[lineId].replace(/^([A-Z])?\[\d+:\d+(?:\.\d+)?\]/, newTimestamp);
+          textarea.value = lines.join('\n');
+          parseLyrics();
+        }
+      }
+    }
+
+    // 現在時間スタンプ挿入
+    function insertTimestampAtCursor() {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const min = Math.floor(currentTime / 60).toString().padStart(2, '0');
+      const sec = Math.floor(currentTime % 60).toString().padStart(2, '0');
+      const ms = Math.floor((currentTime % 1) * 100).toString().padStart(2, '0');
+      
+      const preset = insertPresetSelect.value;
+      const timestampStr = `${preset}[${min}:${sec}.${ms}]`;
+
+      const text = textarea.value;
+      textarea.value = text.substring(0, start) + timestampStr + text.substring(end);
+      
+      parseLyrics();
+      setTimeout(() => {
+        textarea.focus();
+        const nextPos = start + timestampStr.length;
+        textarea.setSelectionRange(nextPos, nextPos);
+      }, 50);
+    }
+
+    // オーディオファイルのロード
+    function loadAudio(event) {
+      const file = event.target.files[0];
+      if (file) {
+        isAudioFailed = false;
+        audioName.classList.remove("text-amber-400");
+        audioName.classList.add("text-gray-500");
+        audioName.innerText = file.name;
+        const objectURL = URL.createObjectURL(file);
+        
+        const wasPlaying = isPlaying;
+        if (isPlaying) {
+          pausePlayback();
+        }
+
+        audioPlayer.src = objectURL;
+        audioPlayer.load();
+
+        audioPlayer.onloadedmetadata = function() {
+          duration = audioPlayer.duration;
+          seekSlider.max = duration;
+          currentTime = 0;
+          updateUI();
+          draw();
+
+          if (wasPlaying) {
+            togglePlay();
+          }
+        };
+      }
+    }
+
+    function onAudioTimeUpdate() {
+      if (isPlaying && !isDraggingSlider && !isAudioFailed) {
+        currentTime = audioPlayer.currentTime;
+        updateUI();
+      }
+    }
+
+    // シーク
+    function seekTo(time) {
+      currentTime = Math.max(0, Math.min(time, duration));
+      if (audioPlayer.src && !isAudioFailed) {
+        audioPlayer.currentTime = currentTime;
+      }
+      updateUI();
+      draw();
+    }
+
+    function adjustOffset(amount) {
+      seekTo(currentTime + amount);
+    }
+
+    function onSeekSlider(event) {
+      isDraggingSlider = true;
+      seekTo(parseFloat(event.target.value));
+      isDraggingSlider = false;
+    }
+
+    // 再生/一時停止
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        if (audioPlayer.src && !isAudioFailed) {
+          audioPlayer.play().catch(err => {
+            console.log("Audio load fallback:", err);
+            isAudioFailed = true;
+          });
+        }
+        lastFrameTime = performance.now();
+        playIndicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span> RECORDABLE`;
+        playIndicator.className = "absolute top-3 left-3 bg-red-950/80 px-2.5 py-1 rounded text-[10px] font-mono flex items-center gap-1.5 text-red-300 border border-red-800";
+        playIcon.setAttribute('data-lucide', 'pause');
+        lucide.createIcons();
+        requestAnimationFrame(gameLoop);
+      } else {
+        pausePlayback();
+      }
+    }
+
+    function pausePlayback() {
+      isPlaying = false;
+      if (audioPlayer.src && !isAudioFailed) {
+        audioPlayer.pause();
+      }
+      playIndicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> IDLE`;
+      playIndicator.className = "absolute top-3 left-3 bg-black/70 px-2.5 py-1 rounded text-[10px] font-mono flex items-center gap-1.5 text-gray-300";
+      playIcon.setAttribute('data-lucide', 'play');
+      lucide.createIcons();
+    }
+
+    function stopPlayback() {
+      pausePlayback();
+      seekTo(0);
+    }
+
+    // アニメーションループ
+    function gameLoop(now) {
+      if (!isPlaying) return;
+
+      if (!audioPlayer.src || audioPlayer.paused || isAudioFailed) {
+        const delta = (now - lastFrameTime) / 1000;
+        currentTime += delta;
+        if (currentTime >= duration) {
+          currentTime = 0;
+          pausePlayback();
+        }
+        updateUI();
+      } else {
+        currentTime = audioPlayer.currentTime;
+        updateUI();
+      }
+      
+      lastFrameTime = now;
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function formatTime(secNum) {
+      const min = Math.floor(secNum / 60).toString().padStart(2, '0');
+      const sec = Math.floor(secNum % 60).toString().padStart(2, '0');
+      const ms = Math.floor((secNum % 1) * 100).toString().padStart(2, '0');
+      return `${min}:${sec}.${ms}`;
+    }
+
+    function updateUI() {
+      seekSlider.value = currentTime;
+      currentTimeText.innerText = formatTime(currentTime);
+      totalTimeText.innerText = formatTime(duration);
+    }
+
+    // --- 各種数学的イージング関数 ---
+    function easeOutSharp(x) {
+      return 1 - Math.pow(1 - x, 6);
+    }
+
+    function easeOutElastic(x) {
+      const c4 = (2 * Math.PI) / 2.5;
+      return x === 0 ? 0 : x === 1 ? 1 : Math.pow(2, -12 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
+    }
+
+    // --- HTML5 Canvas 描画メイン ---
+    function draw() {
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // 背景クリア
+      ctx.clearRect(0, 0, w, h);
+      if (bgMode === 'blue') {
+        ctx.fillStyle = '#0000FF';
+        ctx.fillRect(0, 0, w, h);
+      } else if (bgMode === 'green') {
+        ctx.fillStyle = '#00FF00';
+        ctx.fillRect(0, 0, w, h);
+      } else {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.4)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.02)';
+        const size = 30;
+        for (let x = 0; x < w; x += size * 2) {
+          for (let y = 0; y < h; y += size * 2) {
+            ctx.fillRect(x, y, size, size);
+            ctx.fillRect(x + size, y + size, size, size);
+          }
+        }
+      }
+
+      // 現在時間のアクティブ行取得
+      const activeLines = parsedLines.filter(line => {
+        return currentTime >= line.time && currentTime <= (line.time + line.totalDuration);
+      });
+
+      if (activeLines.length === 0) return;
+
+      const activeLine = activeLines[activeLines.length - 1];
+      const elapsed = currentTime - activeLine.time;
+      const preset = activeLine.preset;
+
+      ctx.save();
+      
+      const centerX = w / 2;
+      const centerY = h / 2;
+
+      // 行全体のフェードアウト
+      let globalAlpha = 1;
+      const timeLeft = activeLine.totalDuration - elapsed;
+      if (timeLeft < 0.4) {
+        globalAlpha = Math.max(0, timeLeft / 0.4);
+      }
+
+      // 新・大項目別 A〜Z 演出プリセット分岐
+      switch (preset) {
+        
+        // --- 1. 緩急・スライド系 (A〜D) ---
+        case 'A': { // Delay Slide (弾むスライド)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const charSpacing = 72;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const charElapsed = elapsed - c.delay;
+            if (charElapsed < 0) return;
+
+            const t = Math.min(charElapsed / 0.75, 1);
+            const eased = easeOutElastic(t);
+
+            const y = centerY + (180 * (1 - eased));
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(c.char, startX + (idx * charSpacing), y);
+          });
+          break;
+        }
+
+        case 'B': { // Horizontal Squash (横伸び高速入場)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const charSpacing = 72;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const charElapsed = elapsed - c.delay;
+            if (charElapsed < 0) return;
+
+            const t = Math.min(charElapsed / 0.5, 1);
+            const eased = easeOutSharp(t);
+
+            // 左から超高速スライド
+            const x = startX + (idx * charSpacing) - (300 * (1 - eased));
+            
+            // 速度差分から伸び(Squash & Stretch)を算出
+            const velocity = (1 - eased) * 1.5; 
+            const scaleX = 1 + velocity;
+            const scaleY = 1 / scaleX;
+
+            ctx.save();
+            ctx.translate(x, centerY);
+            ctx.scale(scaleX, scaleY);
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(c.char, 0, 0);
+            ctx.restore();
+          });
+          break;
+        }
+
+        case 'C': { // Vertical Drop (叩きつけ落下)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const charSpacing = 72;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const charElapsed = elapsed - c.delay;
+            if (charElapsed < 0) return;
+
+            const t = Math.min(charElapsed / 0.6, 1);
+            
+            // 落下・衝突判定用の弾性変形
+            let scaleY = 1;
+            let y = centerY - 400 * Math.pow(1 - t, 2); // 自由落下
+
+            if (t > 0.8 && t < 0.95) {
+              scaleY = 0.5 + (t - 0.8) * 3; // 衝突時のグシャッと潰れ
+            }
+
+            ctx.save();
+            ctx.translate(startX + (idx * charSpacing), y);
+            ctx.scale(1, scaleY);
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(c.char, 0, 0);
+            ctx.restore();
+          });
+          break;
+        }
+
+        case 'D': { // Roll Jump (ローリング入場)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const charSpacing = 72;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const charElapsed = elapsed - c.delay;
+            if (charElapsed < 0) return;
+
+            const t = Math.min(charElapsed / 0.7, 1);
+            const eased = easeOutSharp(t);
+
+            // 放物線ジャンプ
+            const x = startX + (idx * charSpacing) - 100 * (1 - eased);
+            const y = centerY - Math.sin(t * Math.PI) * 120;
+            const rot = (1 - eased) * Math.PI * 2;
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rot);
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(c.char, 0, 0);
+            ctx.restore();
+          });
+          break;
+        }
+
+        // --- 2. 歪み・グリッチ系 (E〜H) ---
+        case 'E': { // Chromatic Typewriter (色収差タイピング)
+          ctx.font = "bold 64px monospace";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const charSpacing = 68;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const charElapsed = elapsed - c.delay;
+            if (charElapsed < 0) return;
+
+            const x = startX + (idx * charSpacing);
+            let rx = 0;
+            if (charElapsed < 0.08) {
+              rx = Math.sin(charElapsed * 150) * 12; // 横揺れラスター
+            }
+
+            ctx.save();
+            ctx.translate(x + rx, centerY);
+
+            if (charElapsed < 0.1) {
+              const split = 10 * (1 - charElapsed / 0.1);
+              ctx.fillStyle = `rgba(255,0,0,${globalAlpha})`;
+              ctx.fillText(c.char, -split, 0);
+              ctx.fillStyle = `rgba(0,255,255,${globalAlpha})`;
+              ctx.fillText(c.char, split, 0);
+            }
+
+            ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+            ctx.fillText(c.char, 0, 0);
+            ctx.restore();
+          });
+          break;
+        }
+
+        case 'F': { // Inversion Flash (輝度反転ストロボ)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          let alpha = Math.min(1, elapsed / 0.3);
+          const drawFlash = (elapsed < 0.06); // 1〜3フレームのみ反転
+
+          if (drawFlash) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, centerY - 80, w, 160);
+            ctx.fillStyle = "#000000"; // 文字を黒反転
+          } else {
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * globalAlpha})`;
+          }
+
+          ctx.fillText(activeLine.text, centerX, centerY);
+          break;
+        }
+
+        case 'G': { // Liquid Raster (水面ゆらぎ)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          // 文字全体を表示。ラスターサイン波で揺らす
+          ctx.save();
+          const amp = 15;
+          const speed = 2.5;
+          
+          for (let i = 0; i < activeLine.text.length; i++) {
+            const charX = centerX - (activeLine.text.length/2 - i) * 70;
+            const yOffset = Math.sin(elapsed * speed + i * 0.5) * amp;
+            ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+            ctx.fillText(activeLine.text[i], charX, centerY + yOffset);
+          }
+          ctx.restore();
+          break;
+        }
+
+        case 'H': { // Turbulent Noise (有機的熱気)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          ctx.save();
+          for (let i = 0; i < activeLine.text.length; i++) {
+            const charX = centerX - (activeLine.text.length/2 - i) * 70;
+            // ランダムに細かく震える
+            const rx = (Math.random() - 0.5) * 6;
+            const ry = (Math.random() - 0.5) * 6;
+            ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+            ctx.fillText(activeLine.text[i], charX + rx, centerY + ry);
+          }
+          ctx.restore();
+          break;
+        }
+
+        // --- 3. クリッピング・幾何学系 (I〜L) ---
+        case 'I': { // Parts Converge (斜めパーツ収束)
+          ctx.font = "bold 72px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const duration = 0.5;
+          const t = Math.min(elapsed / duration, 1);
+          const eased = easeOutSharp(t);
+          const dist = 200 * (1 - eased);
+
+          ctx.save();
+          // 上パーツ
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(0, h); ctx.closePath();
+          ctx.clip();
+          ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX - dist, centerY - dist);
+          ctx.restore();
+
+          // 下パーツ
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+          ctx.clip();
+          ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX + dist, centerY + dist);
+          ctx.restore();
+
+          ctx.restore();
+          break;
+        }
+
+        case 'J': { // Grid Wipe (格子スライススピン出現)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const cols = 8;
+          const rows = 2;
+          const cellW = w / cols;
+          const cellH = h / rows;
+
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const delay = (c * r) * 0.05;
+              const cellElapsed = elapsed - delay;
+              const t = Math.max(0, Math.min(cellElapsed / 0.4, 1));
+              const eased = easeOutSharp(t);
+
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(c * cellW, r * cellH, cellW, cellH);
+              ctx.clip();
+
+              // スライス毎の不規則回転＆ズーム
+              ctx.translate(centerX, centerY);
+              ctx.rotate((1 - eased) * 0.3 * (c % 2 === 0 ? 1 : -1));
+              ctx.scale(eased, eased);
+              ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+              ctx.fillText(activeLine.text, 0, 0);
+              ctx.restore();
+            }
+          }
+          break;
+        }
+
+        case 'K': { // Stripe Slash (すれ違い合体)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const stripeCount = 8;
+          const stripeH = h / stripeCount;
+
+          for (let i = 0; i < stripeCount; i++) {
+            const delay = i * 0.03;
+            const t = Math.max(0, Math.min((elapsed - delay) / 0.4, 1));
+            const eased = easeOutSharp(t);
+
+            // 奇数・偶数で左右交互に侵入
+            const xOffset = (i % 2 === 0 ? -300 : 300) * (1 - eased);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, i * stripeH, w, stripeH);
+            ctx.clip();
+
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(activeLine.text, centerX + xOffset, centerY);
+            ctx.restore();
+          }
+          break;
+        }
+
+        case 'L': { // Wave Reveal (波形ワイプ出現 - 文字領域マスク再設計)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const duration = 0.8;
+          const t = Math.min(elapsed / duration, 1);
+          
+          // 左から右への波形進行境界（最大幅まで進行）
+          const startX = 0;
+          const endX = w * t; 
+
+          ctx.save();
+          ctx.beginPath();
+          
+          // 文字の高さ（centerYの周辺±150px）を確実に内包するクリッピングパスを作成
+          ctx.moveTo(startX, centerY - 160);
+          for (let x = startX; x <= endX; x += 10) {
+            // 時間の経過に合わせて波形を揺らす
+            const waveY = centerY + Math.sin(x * 0.02 - elapsed * 12) * 40;
+            ctx.lineTo(x, waveY - 160); // 文字の十分上部
+          }
+          // 右側のワイプ進行境界で垂直に切り落とす
+          ctx.lineTo(endX, centerY + 160); // 文字の十分下部
+          for (let x = endX; x >= startX; x -= 10) {
+            const waveY = centerY + Math.sin(x * 0.02 - elapsed * 12) * 40;
+            ctx.lineTo(x, waveY + 160);
+          }
+          ctx.closePath();
+          ctx.clip(); // 波形マスクの適用
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX, centerY);
+          ctx.restore();
+          break;
+        }
+
+        // --- 4. 回転・立体表現系 (M〜O) ---
+        case 'M': { // 3D Layer Spin (擬似3D軸回転)
+          ctx.font = "bold 64px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const charSpacing = 72;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const charElapsed = elapsed - c.delay;
+            if (charElapsed < 0) return;
+
+            const t = Math.min(charElapsed / 0.6, 1);
+            const eased = easeOutSharp(t);
+
+            // Y軸を想定した擬似3D回転 (X比率をコサインで潰す)
+            const angle = (1 - eased) * Math.PI; 
+            const scaleX = Math.cos(angle);
+
+            ctx.save();
+            ctx.translate(startX + (idx * charSpacing), centerY);
+            ctx.scale(scaleX, 1);
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(c.char, 0, 0);
+            ctx.restore();
+          });
+          break;
+        }
+
+        case 'N': { // Ghost Ripple (残像置き去り)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const t = Math.min(elapsed / 0.5, 1);
+          const eased = easeOutSharp(t);
+          const slideX = -200 * (1 - eased);
+
+          // 居残り残像（ゴースト）
+          if (t < 0.9) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.18 * (1 - t) * globalAlpha})`;
+            ctx.fillText(activeLine.text, centerX, centerY);
+          }
+
+          // 実体
+          ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX + slideX, centerY);
+          break;
+        }
+
+        case 'O': { // Text Wave (文字の波紋ストローク拡散)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const t = Math.min(elapsed / 0.6, 1);
+          
+          // 実体
+          ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, t * 1.5) * globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX, centerY);
+
+          // 輪郭波紋
+          if (t > 0 && t < 1) {
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.scale(1 + t * 0.4, 1 + t * 0.4);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - t) * 0.5 * globalAlpha})`;
+            ctx.lineWidth = 4;
+            ctx.strokeText(activeLine.text, 0, 0);
+            ctx.restore();
+          }
+          break;
+        }
+
+        // --- 5. タイポ・グラフィカル系 (P〜S) ---
+        case 'P': { // Kinetic Edge (極太ズームアウト - 潰れないようにサイズを微調整)
+          const duration = 0.4;
+          const t = Math.min(elapsed / duration, 1);
+          const eased = easeOutSharp(t);
+          const scale = 2.4 - (1.4 * eased); // ズーム倍率を少しマイルドに調整
+
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.scale(scale, scale);
+
+          ctx.font = "bold 76px sans-serif"; // 潰れを防ぐために88pxから76pxへ縮小
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          ctx.strokeStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+          ctx.lineWidth = 5; // 太さを14から5へ落とし視認性を大きく向上
+          ctx.strokeText(activeLine.text, 0, 0);
+          ctx.restore();
+          break;
+        }
+
+        case 'Q': { // 4-Color Gradient (液体グラデーション)
+          ctx.font = "bold 76px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const textWidth = ctx.measureText(activeLine.text).width;
+          const cycle = Math.sin(elapsed * 1.5) * 50;
+
+          const grad = ctx.createLinearGradient(
+            centerX - textWidth/2 + cycle, centerY - 40,
+            centerX + textWidth/2 - cycle, centerY + 40
+          );
+          grad.addColorStop(0, '#ff0055');
+          grad.addColorStop(0.35, '#8b5cf6');
+          grad.addColorStop(0.7, '#00f0ff');
+          grad.addColorStop(1, '#ffaa00');
+
+          ctx.fillStyle = grad;
+          ctx.globalAlpha = globalAlpha;
+          ctx.fillText(activeLine.text, centerX, centerY);
+          break;
+        }
+
+        case 'R': { // Neon Glow (発光グロス)
+          ctx.font = "bold 70px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          ctx.save();
+          ctx.shadowColor = '#00ffff';
+          ctx.shadowBlur = 25;
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.globalAlpha = globalAlpha;
+          ctx.fillText(activeLine.text, centerX, centerY);
+          ctx.restore();
+          break;
+        }
+
+        case 'S': { // Yin-Yang Split (陰陽境界反転)
+          ctx.font = "bold 70px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          ctx.save();
+          // 左半分: 黒背景に白文字
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, centerX, h);
+          ctx.clip();
+          ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX, centerY);
+          ctx.restore();
+
+          // 右半分: 白背景に黒文字
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(centerX, 0, centerX, h);
+          ctx.clip();
+          ctx.fillStyle = `rgba(0, 0, 0, ${globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX, centerY);
+          ctx.restore();
+
+          ctx.restore();
+          break;
+        }
+
+        // --- 6. 破壊・粒子系 (T〜V) ---
+        case 'T': { // Orbit Particle (粒子らせん収束)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const duration = 0.8;
+          const t = Math.min(elapsed / duration, 1);
+          const eased = easeOutSharp(t);
+
+          const charSpacing = 72;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const destX = startX + (idx * charSpacing);
+            
+            // らせん軌道の計算
+            const radius = 250 * (1 - eased);
+            const angle = (1 - eased) * 4 * Math.PI + idx;
+            const px = destX + Math.cos(angle) * radius;
+            const py = centerY + Math.sin(angle) * radius;
+
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(c.char, px, py);
+          });
+          break;
+        }
+
+        case 'U': { // Shatter Reverse (破片巻き戻し)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const duration = 0.7;
+          const t = Math.min(elapsed / duration, 1);
+          const eased = easeOutSharp(t);
+
+          const charSpacing = 72;
+          const totalWidth = (activeLine.chars.length - 1) * charSpacing;
+          const startX = centerX - totalWidth / 2;
+
+          activeLine.chars.forEach((c, idx) => {
+            const destX = startX + (idx * charSpacing);
+            // 破片が散らばっている初期位置からのマージ
+            const seed = idx * 95;
+            const px = destX + Math.sin(seed) * 150 * (1 - eased);
+            const py = centerY + Math.cos(seed) * 150 * (1 - eased);
+            const rot = (1 - eased) * 1.5;
+
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(rot);
+            ctx.fillStyle = `rgba(255, 255, 255, ${t * globalAlpha})`;
+            ctx.fillText(c.char, 0, 0);
+            ctx.restore();
+          });
+          break;
+        }
+
+        case 'V': { // Pixel Dissolve (累積ドット出現 - オフスクリーンCanvasバッファ合成方式で背景破壊を完全に防ぐ)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const duration = 0.8;
+          const t = Math.min(elapsed / duration, 1);
+
+          // テキストの描画領域サイズを計測
+          const textMetrics = ctx.measureText(activeLine.text);
+          const textW = Math.ceil(textMetrics.width + 100);
+          const textH = 140;
+
+          const startX = Math.floor(centerX - textW / 2);
+          const startY = Math.floor(centerY - textH / 2);
+
+          // 1. オフスクリーンCanvasをメモリ内で生成してメインレイヤーへの直接的な破壊干渉を防ぐ
+          const offCanvas = document.createElement('canvas');
+          offCanvas.width = textW;
+          offCanvas.height = textH;
+          const offCtx = offCanvas.getContext('2d');
+
+          // 2. 一時コンテクストにテキストだけを描画
+          offCtx.font = ctx.font;
+          offCtx.textAlign = 'center';
+          offCtx.textBaseline = 'middle';
+          offCtx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+          offCtx.fillText(activeLine.text, textW / 2, textH / 2);
+
+          // 3. 一時コンテクストの合成演算を 'destination-in' に指定してマスク化
+          offCtx.globalCompositeOperation = 'destination-in';
+          
+          const pixelSize = 8;
+          offCtx.fillStyle = '#FFFFFF';
+          
+          // テキスト領域サイズ分のみをドットグリッド走査 (高速処理)
+          for (let x = 0; x < textW; x += pixelSize) {
+            for (let y = 0; y < textH; y += pixelSize) {
+              const rawRand = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+              const randVal = rawRand - Math.floor(rawRand);
+              
+              if (randVal < t) {
+                offCtx.fillRect(x, y, pixelSize, pixelSize);
+              }
+            }
+          }
+
+          // 4. マスク処理を施したオフスクリーン文字レイヤーをメインCanvas上に貼り付け
+          ctx.drawImage(offCanvas, startX, startY);
+          break;
+        }
+
+        // --- 7. 実用・インターフェース系 (W〜Z) ---
+        case 'W': { // Constant Terminal (等速カーソル)
+          ctx.font = "bold 54px monospace";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          let renderText = '';
+          activeLine.chars.forEach(c => {
+            if (elapsed >= c.delay) {
+              renderText += c.char;
+            }
+          });
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+          ctx.fillText(renderText, centerX, centerY);
+
+          if (Math.floor(performance.now() / 250) % 2 === 0 && timeLeft >= 0.2) {
+            const textWidth = ctx.measureText(renderText).width;
+            ctx.fillText('│', centerX + textWidth/2 + 10, centerY);
+          }
+          break;
+        }
+
+        case 'X': { // Morse Flicker (不規則点滅)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          // 不規則点滅アルゴリズム (モールス点灯)
+          let visible = true;
+          if (elapsed < 0.6) {
+            const pattern = Math.floor(elapsed * 18) % 3;
+            visible = (pattern !== 0);
+          }
+
+          if (visible) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+            ctx.fillText(activeLine.text, centerX, centerY);
+          }
+          break;
+        }
+
+        case 'Y': { // Laser Scan (拡張焼き付け)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const duration = 0.8;
+          const t = Math.min(elapsed / duration, 1);
+          const scanY = (centerY - 80) + 160 * t; // 上から下にスキャン
+
+          ctx.save();
+          // 通過部分のみクリップ
+          ctx.beginPath();
+          ctx.rect(0, 0, w, scanY);
+          ctx.clip();
+          ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX, centerY);
+          ctx.restore();
+
+          // スキャンレーザー線
+          if (t < 1) {
+            ctx.strokeStyle = `rgba(0, 255, 255, ${globalAlpha})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(centerX - 350, scanY);
+            ctx.lineTo(centerX + 350, scanY);
+            ctx.stroke();
+          }
+          break;
+        }
+
+        case 'Z': { // Zero Gravity (手振れ浮遊)
+          ctx.font = "bold 68px sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          // カオティックな手振れサイン波
+          const rx = Math.sin(elapsed * 2.1) * 8;
+          const ry = Math.cos(elapsed * 1.8) * 8;
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${globalAlpha})`;
+          ctx.fillText(activeLine.text, centerX + rx, centerY + ry);
+          break;
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // ショートカットイベント
+    document.addEventListener('keydown', function(e) {
+      if (e.target === textarea || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+        if (e.code === 'Space' && e.ctrlKey) {
+          e.preventDefault();
+          insertTimestampAtCursor();
+        }
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      }
+    });
+  </script>
+</body>
+</html>

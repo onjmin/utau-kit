@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MV-Kit | ボカロMV制作ツール集</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex font-sans antialiased">
+
+  <aside class="w-64 border-r border-gray-700/50 p-4 flex flex-col gap-2">
+    <div class="px-2 py-4 mb-4">
+      <h1 class="text-lg font-bold tracking-wider">MV-Kit</h1>
+      <p class="text-xs text-gray-500">Vocaloid MV Tools</p>
+    </div>
+    
+    <nav id="menu" class="flex flex-col gap-1">
+      </nav>
+  </aside>
+
+  <main class="flex-1 bg-slate-950">
+    <iframe 
+      id="tool-frame" 
+      class="w-full h-full border-none" 
+      src="about:blank"
+    ></iframe>
+  </main>
+
+  <script>
+    const tools = [
+      { name: "LRC歌詞エディター", file: "tools/lrc-tagger.html" },
+      { name: "ドットフェードGIF生成", file: "tools/dot-fade-gif-generator.html" },
+      { name: "歌詞PVメイカー", file: "tools/lyric-pv-maker.html" },
+      { name: "MIDI歌詞マッチング", file: "tools/midi-lyrics-matcher.html" },
+      { name: "歌詞の連続音変換ツール", file: "tools/vowel-converter.html" }
+    ];
+
+    const menu = document.getElementById('menu');
+    const frame = document.getElementById('tool-frame');
+
+    tools.forEach(tool => {
+      const btn = document.createElement('button');
+      btn.className = "w-full text-left px-3 py-2 rounded-md transition-colors bg-gray-100/10 hover:bg-gray-100/20 text-sm";
+      btn.textContent = tool.name;
+      btn.onclick = () => {
+        frame.src = tool.file;
+      };
+      menu.appendChild(btn);
+    });
+
+    // 初期ロード（最初のツール）
+    if (tools.length > 0) {
+      frame.src = tools[0].file;
+    }
+  </script>
+</body>
+</html>

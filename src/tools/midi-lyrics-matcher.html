@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI歌詞パッチジェネレーター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://colxi.info/midi-parser-js/src/main.js"></script>
+    <style>
+        body { background-color: #ffffff; color: #1f2937; }
+        .glass-input {
+            background-color: rgba(243, 244, 246, 0.5);
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            color: inherit;
+        }
+        .glass-input:focus {
+            outline: 2px solid rgba(59, 130, 246, 0.4);
+            background-color: #ffffff;
+            border-color: #3b82f6;
+        }
+        select option {
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+        .glass-panel {
+            background-color: rgba(243, 244, 246, 0.3);
+            border: 1px solid #e5e7eb;
+        }
+        .btn-action {
+            background-color: rgba(243, 244, 246, 0.8);
+            border: 1px solid #9ca3af;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .btn-action:hover {
+            background-color: #f3f4f6;
+            border-color: #4b5563;
+        }
+        /* ログ用スタイル */
+        .log-entry { border-left: 2px solid #e5e7eb; padding-left: 8px; margin-bottom: 2px; font-family: monospace; font-size: 11px; }
+        .log-success { border-color: #10b981; color: #059669; }
+        .log-error { border-color: #ef4444; color: #dc2626; }
+        .log-info { border-color: #3b82f6; color: #2563eb; }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen font-sans">
+
+    <div class="max-w-5xl mx-auto space-y-8">
+        <header class="space-y-2 border-b border-gray-100 pb-4">
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900">MIDI Lyrics Pitch Matcher</h1>
+            <p class="text-gray-500 text-sm italic">MIDIの音高を解析し、録音済み音源ラベルを歌詞に自動マッピングします。</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="space-y-6">
+                <section class="p-6 rounded-xl glass-panel space-y-4 shadow-sm">
+                    <div>
+                        <label class="block text-sm font-bold mb-3">1. MIDIファイルを指定</label>
+                        <input type="file" id="midiInput" accept=".mid" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-gray-400 file:text-sm file:font-semibold file:bg-white file:text-gray-700 hover:file:bg-gray-50 cursor-pointer">
+                    </div>
+
+                    <div id="trackSelectorArea" class="hidden space-y-2 pt-4 border-t border-gray-200">
+                        <label class="block text-sm font-bold">使用するトラックを選択</label>
+                        <select id="trackSelect" class="w-full p-2.5 glass-input text-sm font-medium"></select>
+                    </div>
+                </section>
+
+                <section class="p-6 rounded-xl glass-panel space-y-4 shadow-sm">
+                    <label class="block text-sm font-bold">2. 歌詞と音階リストの入力</label>
+                    <div class="space-y-4">
+                        <div>
+                            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-black">Lyrics</span>
+                            <textarea id="lyricsInput" rows="5" class="w-full p-3 glass-input text-sm mt-1" placeholder="あをちょだ&#10;かじょ れしょ..."></textarea>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-black">Available Scales (One per line)</span>
+                            <textarea id="scalesInput" rows="4" class="w-full p-3 glass-input text-sm mt-1" placeholder="D5&#10;G4&#10;E4&#10;F3"></textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <button id="processBtn" class="w-full btn-action py-4 rounded-xl font-bold text-lg text-gray-800 shadow-sm border-2 border-gray-400">
+                    変換を実行する
+                </button>
+            </div>
+
+            <div class="flex flex-col space-y-4">
+                <section class="flex-1 p-6 rounded-xl glass-panel flex flex-col min-h-[400px] shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <label class="text-sm font-bold uppercase tracking-widest text-gray-400 text-[10px]">Result Output</label>
+                        <button id="copyBtn" class="text-xs btn-action px-4 py-1.5 rounded-md font-bold border-gray-400">結果をコピー</button>
+                    </div>
+                    <textarea id="resultOutput" readonly class="flex-1 w-full p-4 glass-input text-sm font-mono leading-relaxed resize-none bg-white/50" placeholder="ここに変換結果が表示されます"></textarea>
+                </section>
+                
+                <!-- デバッグログ表示エリア -->
+                <section class="p-4 rounded-xl glass-panel space-y-2 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold uppercase text-gray-400">Debug Process Log</span>
+                        <button id="clearLogBtn" class="text-[9px] text-gray-400 hover:underline">Clear Log</button>
+                    </div>
+                    <div id="logContainer" class="max-h-32 overflow-y-auto text-xs bg-gray-50/50 p-2 rounded border border-gray-100">
+                        <div class="text-gray-400 italic">待機中...</div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        const STORAGE_KEY_SCALES = 'midi_matcher_scales_v3';
+        let g_midiData = null;
+
+        const addLog = (msg, type = 'info') => {
+            const container = document.getElementById('logContainer');
+            if (container.querySelector('.italic')) container.innerHTML = '';
+            
+            const div = document.createElement('div');
+            const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            div.className = `log-entry ${type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : 'log-info'}`;
+            div.textContent = `[${time}] ${msg}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        };
+
+        const nameToNote = (name) => {
+            const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const match = name.trim().match(/^([A-G]#?)(\d+)$/i);
+            if (!match) return null;
+            const step = names.indexOf(match[1].toUpperCase());
+            const octave = parseInt(match[2]);
+            return (octave + 1) * 12 + step;
+        };
+
+        const parseLyrics = (text) => {
+            const cleanText = text.replace(/\s+/g, '');
+            const tokens = [];
+            for (let i = 0; i < cleanText.length; i++) {
+                const char = cleanText[i];
+                const next = cleanText[i + 1];
+                if (next && 'ゃゅょャュョ'.includes(next)) {
+                    tokens.push(char + next);
+                    i++;
+                } else {
+                    tokens.push(char);
+                }
+            }
+            return tokens;
+        };
+
+        const init = () => {
+            const midiInput = document.getElementById('midiInput');
+            const trackSelect = document.getElementById('trackSelect');
+            const lyricsInput = document.getElementById('lyricsInput');
+            const scalesInput = document.getElementById('scalesInput');
+            const processBtn = document.getElementById('processBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const resultOutput = document.getElementById('resultOutput');
+            const trackSelectorArea = document.getElementById('trackSelectorArea');
+            const clearLogBtn = document.getElementById('clearLogBtn');
+
+            const savedScales = localStorage.getItem(STORAGE_KEY_SCALES);
+            if (savedScales) scalesInput.value = savedScales;
+
+            clearLogBtn.onclick = () => {
+                document.getElementById('logContainer').innerHTML = '<div class="text-gray-400 italic">待機中...</div>';
+            };
+
+            // ファイル選択時に自動実行
+            midiInput.addEventListener('change', (e) => {
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
+                
+                addLog(`ファイルを選択しました: ${files[0].name}`);
+                g_midiData = null;
+                trackSelectorArea.classList.add('hidden');
+                trackSelect.innerHTML = '';
+
+                try {
+                    addLog('MidiParser.parse を開始します...');
+                    
+                    // ライブラリの実行。もしここでイベントが止まるなら、ファイル形式の問題かライブラリのバグ
+                    window.MidiParser.parse(midiInput, (obj) => {
+                        addLog('MidiParser のコールバックを受信しました。');
+                        
+                        try {
+                            if (!obj) throw new Error('解析結果が null です。');
+                            addLog('MIDIオブジェクトの構造を確認中...');
+
+                            if (!obj.track || !Array.isArray(obj.track)) {
+                                throw new Error('MIDI内に有効なトラック配列が見つかりません。');
+                            }
+                            
+                            addLog(`トラック数: ${obj.track.length}`);
+                            g_midiData = obj;
+                            let validTrackFound = false;
+
+                            obj.track.forEach((t, i) => {
+                                const noteEvents = t.event ? t.event.filter(ev => ev.type === 9) : [];
+                                const noteCount = noteEvents.length;
+                                
+                                if (noteCount > 0) {
+                                    const option = document.createElement('option');
+                                    option.value = i;
+                                    option.textContent = `Track ${i} (${noteCount} notes)`;
+                                    trackSelect.appendChild(option);
+                                    validTrackFound = true;
+                                    addLog(`トラック ${i}: ${noteCount} 個の音符を検出。`, 'success');
+                                }
+                            });
+
+                            if (!validTrackFound) {
+                                addLog('警告: 音符（Note On）が含まれるトラックが一つもありません。', 'error');
+                            } else {
+                                trackSelectorArea.classList.remove('hidden');
+                                addLog('UIの更新を完了しました。トラックを選択してください。', 'success');
+                            }
+                        } catch (innerError) {
+                            addLog(`解析中のエラー: ${innerError.message}`, 'error');
+                        }
+                    });
+                    
+                    // 非同期のため、ここですぐに終わるわけではないが、呼び出し自体は成功したことを記録
+                    addLog('MidiParser へのリクエストを送信しました（非同期処理待ち）...');
+
+                } catch (err) {
+                    addLog(`致命的なエラー: ${err.message}`, 'error');
+                }
+            });
+
+            processBtn.addEventListener('click', () => {
+                addLog('変換処理を開始します...');
+                if (!g_midiData) {
+                    addLog('エラー: MIDIデータがロードされていません。', 'error');
+                    return;
+                }
+
+                const trackIdx = trackSelect.value;
+                const lyricsText = lyricsInput.value;
+                const scalesText = scalesInput.value;
+
+                localStorage.setItem(STORAGE_KEY_SCALES, scalesText);
+
+                const lyrics = parseLyrics(lyricsText);
+                addLog(`歌詞の解析完了: ${lyrics.length} 文字`);
+
+                const availableScales = scalesText.split('\n')
+                    .map(s => s.trim())
+                    .filter(s => s)
+                    .map(s => ({ name: s, note: nameToNote(s) }))
+                    .filter(s => s.note !== null);
+
+                if (availableScales.length === 0) {
+                    addLog('エラー: 有効な音源スケールがありません。', 'error');
+                    return;
+                }
+                addLog(`音源スケールのロード完了: ${availableScales.length} 種類`);
+
+                try {
+                    const targetTrack = g_midiData.track[trackIdx];
+                    const notes = targetTrack.event.filter(ev => ev.type === 9 && ev.data && ev.data[1] > 0);
+                    addLog(`ターゲットトラックの音符数: ${notes.length}`);
+
+                    if (notes.length === 0) throw new Error('トラックに音符がありません。');
+
+                    const result = lyrics.map((char, i) => {
+                        if (i >= notes.length) return null;
+                        const midiPitch = notes[i].data[0];
+                        let closest = availableScales[0];
+                        let minDiff = Math.abs(midiPitch - closest.note);
+                        for (const scale of availableScales) {
+                            const diff = Math.abs(midiPitch - scale.note);
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                closest = scale;
+                            }
+                        }
+                        return `"- ${char}_${closest.name}"`;
+                    }).filter(v => v !== null);
+
+                    resultOutput.value = result.join(' ');
+                    addLog(`変換完了: ${result.length} 個のデータを生成しました。`, 'success');
+                } catch (procError) {
+                    addLog(`変換中のエラー: ${procError.message}`, 'error');
+                }
+            });
+
+            copyBtn.addEventListener('click', function() {
+                const content = resultOutput.value;
+                if (!content) return;
+                try {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = content;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    
+                    const originalText = this.textContent;
+                    this.textContent = 'コピー完了';
+                    addLog('クリップボードにコピーしました。');
+                    setTimeout(() => this.textContent = originalText, 2000);
+                } catch (err) {
+                    addLog('コピーに失敗しました。', 'error');
+                }
+            });
+
+            addLog('システム準備完了。', 'success');
+        };
+
+        init();
+    </script>
+</body>
+</html>
