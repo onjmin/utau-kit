@@ -25,10 +25,133 @@
 const { useState, useEffect, useRef, useCallback } = React;
 
 const colorThemes = {
-  "イワシがつちからはえてくるんだ風": { "maj7": "#d8b4fe", "m7": "#86efac", "7": "#fca5a5", "other": "#9ca3af" },
-  "ブドウがかげからのぞいてるんだ風": { "maj7": "#c084fc", "m7": "#fb7185", "7": "#fde047", "other": "#d1d5db" },
-  "ことりがそらへとおちてゆく風": { "maj7": "#7dd3fc", "m7": "#a78bfa", "7": "#f472b6", "other": "#e5e7eb" },
-  "あさやけもゆうやけもないんだ風": { "maj7": "#f97316", "m7": "#f43f5e", "7": "#60a5fa", "other": "#c7d2fe" }
+  "イワシがつちからはえてくるんだ風": { "maj7": "#d8b4fe", "m7": "#86efac", "7": "#fca5a5", "other": "#9ca3af", specialVI: "#f59e0b" },
+  "ブドウがかげからのぞいてるんだ風": { "maj7": "#c084fc", "m7": "#fb7185", "7": "#fde047", "dim": "#a5b4fc", "other": "#d1d5db", specialVI: "#f97316" },
+  "ことりがそらへとおちてゆく風": { "degree1": "#7dd3fc", "degree2": "#a78bfa", "degree3": "#f472b6", "degree4": "#fbbf24", "degree5": "#34d399", "degree6": "#fb7185", "degree7": "#e879f9", "proxy": "#facc15", "other": "#9ca3af" },
+  "あさやけもゆうやけもないんだ風": { "maj7": "#fbbf24", "m7": "#f43f5e", "other": "#c7d2fe", "degree3": "#0ea5e9" }
+};
+
+const themeKeys = {
+  "イワシがつちからはえてくるんだ風": 5,
+  "ブドウがかげからのぞいてるんだ風": 0,
+  "ことりがそらへとおちてゆく風": 0,
+  "あさやけもゆうやけもないんだ風": 3
+};
+
+const rootToPitch = {
+  C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5, "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11
+};
+
+const themeConfig = {
+  maxLightness: 0.35,
+  saturation: 0.65
+};
+
+const setThemeConfig = (config) => Object.assign(themeConfig, config);
+
+const normalizeHue = (h) => ((h % 360) + 360) % 360;
+
+const createColor = (h, s, l) => {
+  const safeL = Math.min(l, themeConfig.maxLightness);
+  return `hsl(${normalizeHue(h)}, ${s * 100}%, ${safeL * 100}%)`;
+};
+
+const keyToPitch = (key) => typeof key === 'number' ? key : rootToPitch[key] ?? 0;
+
+const getDegree = (chordObj, key) => {
+  const root = chordObj.pitch % 12;
+  const keyPitch = keyToPitch(key);
+  const diff = (root - keyPitch + 12) % 12;
+  const scaleMap = [1, null, 2, null, 3, 4, null, 5, null, 6, null, 7];
+  return scaleMap[diff];
+};
+
+const isDegree = (chordObj, key, degree) => getDegree(chordObj, key) === degree;
+
+const getProxyColor = (baseColor) => {
+  const proxyMap = {
+    '#7dd3fc': '#38bdf8',
+    '#a78bfa': '#818cf8',
+    '#f472b6': '#fb7185',
+    '#fbbf24': '#f59e0b',
+    '#34d399': '#22c55e',
+    '#fb7185': '#f43f5e',
+    '#e879f9': '#c084fc'
+  };
+  return proxyMap[baseColor] || '#fcd34d';
+};
+
+const qualityToHue = (quality) => {
+  if (quality.includes('maj7')) return 120;
+  if (quality.includes('maj')) return 110;
+  if (quality.includes('m7')) return 200;
+  if (quality.includes('7')) return 330;
+  if (quality.includes('dim')) return 280;
+  return 50;
+};
+
+const degreeHueMap = {
+  1: 0,
+  2: 40,
+  3: 80,
+  4: 120,
+  5: 160,
+  6: 200,
+  7: 240
+};
+
+const getIwashiColor = (chordObj, key) => {
+  if (isDegree(chordObj, key, 6) && chordObj.chord === 'm7') {
+    return createColor(200, themeConfig.saturation, 0.3);
+  }
+  return createColor(qualityToHue(chordObj.chord), themeConfig.saturation, 0.3);
+};
+
+const getBudouColor = (chordObj, key) => {
+  const q = chordObj.chord;
+  if (isDegree(chordObj, key, 6) && q === 'm7') {
+    return createColor(220, themeConfig.saturation, 0.3);
+  }
+  if (q.includes('maj')) return createColor(140, themeConfig.saturation, 0.32);
+  if (q.includes('dim')) return createColor(280, themeConfig.saturation, 0.28);
+  if (q.includes('m7')) return createColor(210, themeConfig.saturation, 0.3);
+  if (q.includes('7')) return createColor(10, themeConfig.saturation, 0.3);
+  return createColor(50, themeConfig.saturation, 0.3);
+};
+
+const getKotoriColor = (chordObj, key, lastColor) => {
+  const degree = getDegree(chordObj, key);
+  const baseHue = degreeHueMap[degree] ?? 0;
+  const baseColor = createColor(baseHue, themeConfig.saturation, 0.3);
+  if (baseColor === lastColor) {
+    return createColor(baseHue, themeConfig.saturation, 0.25);
+  }
+  return baseColor;
+};
+
+const getAsayakeColor = (chordObj, key) => {
+  const degree = getDegree(chordObj, key);
+  if (degree === 3) return createColor(200, themeConfig.saturation, 0.3);
+  const q = chordObj.chord;
+  if (q.includes('maj7')) return createColor(100, themeConfig.saturation, 0.32);
+  if (q.includes('m7')) return createColor(210, themeConfig.saturation, 0.28);
+  return createColor(40, themeConfig.saturation, 0.3);
+};
+
+const getChordColor = (chordObj, themeName, lastColor) => {
+  const key = themeKeys[themeName] ?? 0;
+  switch (themeName) {
+    case "イワシがつちからはえてくるんだ風":
+      return getIwashiColor(chordObj, key);
+    case "ブドウがかげからのぞいてるんだ風":
+      return getBudouColor(chordObj, key);
+    case "ことりがそらへとおちてゆく風":
+      return getKotoriColor(chordObj, key, lastColor);
+    case "あさやけもゆうやけもないんだ風":
+      return getAsayakeColor(chordObj, key);
+    default:
+      return getIwashiColor(chordObj, key);
+  }
 };
 
 const notationMaps = {
@@ -40,19 +163,64 @@ const notationMaps = {
   accidental: { label: "記号表示", options: { standard: "♯/♭", ascii: "#/b" } }
 };
 
-const initialProgression = `#Intro
+const initialProgression = `#転載元：https://rechord.cc/FTp6Yr_gU4Y
+#Intro
 Dm7Am7|Dm7Am7|Dm7Am7|
 Dm7==%==A7=Dm7===D♯m7===|
 #Verse
 Dm7Am7|Dm7Am7|Gm7C7|FM7F7|
 Em7(♭5)A7|Dm7C|B♭M7Am7|
-Dm7==D♭M7==CM7=BM7===A7===|`;
+Dm7==D♭M7==CM7=BM7===A7===|
+#Pre-chorus
+Dm7C|B♭M7FM7|Gm7C7|FM7F7|
+B♭M7Am7|Dm7C|Gm7C7|Em7(♭5)A|
+Dm7C|B♭M7FM7|Gm7C7|FM7F7|
+B♭M7Am7|Dm7F7|Gm7C7|FC/E|
+#Chorus
+B♭M7|%C7|Dm7|Cm7F7|
+B♭M7|%A7|Dm7|Cm7F7|
+B♭M7|%C7|Dm7|Cm7F7|
+B♭M7|%A7|Dm7|Cm7F7|
+#Interlude
+Dm7Am7|Dm7Am7|Dm7Am7|
+Dm7==%==A7=Dm7===D♯m7===|
+#Verse
+Dm7Am7|Dm7Am7|Gm7C7|FM7F7|
+Em7(♭5)A7|Dm7C|B♭M7Am7|
+Dm7==D♭M7==CM7=BM7===A7===|
+#Pre-chorus
+Dm7C|B♭M7FM7|Gm7C7|FM7F7|
+B♭M7Am7|Dm7C|Gm7C7|Em7(♭5)A|
+Dm7C|B♭M7FM7|Gm7C7|FM7F7|
+B♭M7Am7|Dm7F7|Gm7C7|FC/E|
+Dm7C|B♭M7FM7|Gm7C7|FM7F7|
+B♭M7Am7|Dm7C|Gm7C7|Em7(♭5)A|
+Dm7C|B♭M7FM7|Gm7C7|FM7F7|
+B♭M7Am7|Dm7F7|Gm7C7|FC/E|
+#Ending
+Dm7Am7|Dm7Am7|Dm7Am7|Dm7A7Dm7_|
+
+#ChordWiki にさらに詳しい内容を投稿済み。
+#https://ja.chordwiki.org/wiki/sm19635778`;
 
 const App = () => {
   const [progression, setProgression] = useState(initialProgression);
   const [bpm, setBpm] = useState(135);
   const [theme, setTheme] = useState("イワシがつちからはえてくるんだ風");
-  const [notation, setNotation] = useState({ maj: "M7", min: "m7", dim: "dim", half: "m7(♭5)", aug: "aug", accidental: "standard" });
+  const [maxLightness, setMaxLightness] = useState(themeConfig.maxLightness);
+  const [textOffsetX, setTextOffsetX] = useState(8);
+  const [textOffsetY, setTextOffsetY] = useState(-4);
+  const [textSize, setTextSize] = useState(38);
+  const [triangleScale, setTriangleScale] = useState(0.78);
+  const [playbackMode, setPlaybackMode] = useState("youtube");
+  const [youtubeUrl, setYoutubeUrl] = useState("https://www.youtube.com/watch?v=d_T1StgldnM");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileUrl, setFileUrl] = useState("");
+  const [fileType, setFileType] = useState("audio");
+  const [syncedDelay, setSyncedDelay] = useState(7.2);
+  const [youtubeApiReady, setYoutubeApiReady] = useState(false);
+  const [youtubePlayerReady, setYoutubePlayerReady] = useState(false);
+  const [notation, setNotation] = useState({ maj: "Δ7", min: "m7", dim: "dim", half: "m7(♭5)", aug: "aug", accidental: "ascii" });
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [chords, setChords] = useState([]);
@@ -60,6 +228,122 @@ const App = () => {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const startTimeRef = useRef(0);
   const progressBarRef = useRef(null);
+  const youtubePlayerRef = useRef(null);
+  const youtubeContainerRef = useRef(null);
+  const mediaRef = useRef(null);
+
+  const parseYouTubeId = (url) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname.includes('youtu.be')) {
+        return parsed.pathname.slice(1);
+      }
+      if (parsed.hostname.includes('youtube.com')) {
+        return parsed.searchParams.get('v');
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (window.YT) {
+      setYoutubeApiReady(true);
+      return;
+    }
+    if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      return;
+    }
+    window.onYouTubeIframeAPIReady = () => setYoutubeApiReady(true);
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.body.appendChild(tag);
+    return () => {
+      delete window.onYouTubeIframeAPIReady;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!youtubeApiReady || playbackMode !== 'youtube' || !youtubeContainerRef.current) return;
+    const videoId = parseYouTubeId(youtubeUrl);
+    if (!videoId) return;
+    if (youtubePlayerRef.current) {
+      if (window.YT && youtubePlayerReady) {
+        youtubePlayerRef.current.loadVideoById({ videoId, startSeconds: 0 });
+      }
+      return;
+    }
+    youtubePlayerRef.current = new window.YT.Player(youtubeContainerRef.current, {
+      width: '320',
+      height: '180',
+      videoId,
+      playerVars: { rel: 0, modestbranding: 1, controls: 1, disablekb: 1 },
+      events: {
+        onReady: () => setYoutubePlayerReady(true),
+        onStateChange: () => {},
+      },
+    });
+
+    return () => {
+      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.destroy === 'function') {
+        try {
+          youtubePlayerRef.current.destroy();
+        } catch (e) {
+          console.warn('Failed to destroy YouTube player:', e);
+        }
+        youtubePlayerRef.current = null;
+      }
+    };
+  }, [youtubeApiReady, playbackMode, youtubeUrl, youtubePlayerReady]);
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setFileUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(selectedFile);
+    setFileUrl(url);
+    setFileType(selectedFile.type.startsWith('video/') ? 'video' : 'audio');
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
+
+  const seekAndPlayMedia = async () => {
+    if (playbackMode === 'youtube') {
+      if (!youtubePlayerReady || !youtubePlayerRef.current) return false;
+      try {
+        youtubePlayerRef.current.seekTo(0, true);
+        youtubePlayerRef.current.playVideo();
+        return true;
+      } catch (e) {
+        console.error('YouTube play error', e);
+        return false;
+      }
+    }
+    const media = mediaRef.current;
+    if (!media) return false;
+    try {
+      media.currentTime = 0;
+      await media.play();
+      return true;
+    } catch (e) {
+      console.error('Media play error', e);
+      return false;
+    }
+  };
+
+  const handleSyncPlay = async () => {
+    const ready = await prepareAnimation();
+    if (!ready) return;
+    setIsPlaying(false);
+    setCurrentTime(0);
+    const started = await seekAndPlayMedia();
+    if (!started) return;
+    setTimeout(() => {
+      startTimeRef.current = performance.now();
+      setIsPlaying(true);
+    }, Math.round(syncedDelay * 1000));
+  };
 
   const prepareAnimation = useCallback(async () => {
     try {
@@ -69,9 +353,11 @@ const App = () => {
       setIsPlaying(false);
       setCurrentTime(0);
       startTimeRef.current = performance.now();
+      return true;
     } catch (e) {
       console.error("Parse Error", e);
       setIsReady(false);
+      return false;
     }
   }, [progression, bpm]);
 
@@ -88,6 +374,15 @@ const App = () => {
     return f;
   };
 
+  const renderFormattedChord = (chord) => {
+    const formatted = formatChord(chord);
+    return formatted.split(/([△Δ])/g).map((part, index) =>
+      part === '△' || part === 'Δ'
+        ? <span key={index} style={{ display: 'inline-block', fontSize: 'inherit', lineHeight: 1, verticalAlign: 'baseline', transform: `scaleX(${triangleScale})`, transformOrigin: 'left center' }}>{part}</span>
+        : part
+    );
+  };
+
   const totalDuration = chords.length > 0 ? chords[chords.length - 1].when + chords[chords.length - 1].duration : 1;
 
   const updateCurrentTimeFromClientX = (clientX) => {
@@ -98,6 +393,10 @@ const App = () => {
     setCurrentTime(newTime);
     startTimeRef.current = performance.now() - (newTime * 1000);
   };
+
+  useEffect(() => {
+    setThemeConfig({ maxLightness });
+  }, [maxLightness]);
 
   useEffect(() => {
     let frame;
@@ -161,6 +460,31 @@ const App = () => {
                 {Object.keys(colorThemes).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-bold mb-1 text-gray-500">明度上限</label>
+              <input type="range" min="0.1" max="0.6" step="0.01" value={maxLightness} onChange={(e) => setMaxLightness(Number(e.target.value))} className="w-40" />
+              <div className="text-xs text-gray-400">{Math.round(maxLightness * 100)}%</div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1 text-gray-500">文字位置 X</label>
+              <input type="range" min="0" max="16" step="1" value={textOffsetX} onChange={(e) => setTextOffsetX(Number(e.target.value))} className="w-40" />
+              <div className="text-xs text-gray-400">{textOffsetX}px</div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1 text-gray-500">文字位置 Y</label>
+              <input type="range" min="-8" max="0" step="1" value={textOffsetY} onChange={(e) => setTextOffsetY(Number(e.target.value))} className="w-40" />
+              <div className="text-xs text-gray-400">{textOffsetY}px</div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1 text-gray-500">文字サイズ</label>
+              <input type="range" min="16" max="48" step="1" value={textSize} onChange={(e) => setTextSize(Number(e.target.value))} className="w-40" />
+              <div className="text-xs text-gray-400">{textSize}px</div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1 text-gray-500">△/Δ 比率</label>
+              <input type="range" min="0.6" max="1.0" step="0.01" value={triangleScale} onChange={(e) => setTriangleScale(Number(e.target.value))} className="w-40" />
+              <div className="text-xs text-gray-400">{Math.round(triangleScale * 100)}%</div>
+            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             {Object.entries(notationMaps).map(([type, { label, options }]) => (
@@ -173,6 +497,48 @@ const App = () => {
                 </select>
               </div>
             ))}
+          </div>
+        </div>
+        <div className="p-4 border border-gray-300 rounded bg-gray-100/5">
+          <div className="mb-3 font-bold text-gray-200">同期再生設定</div>
+          <div className="flex flex-wrap gap-4 items-end">
+            <label className="flex items-center gap-2 text-sm text-gray-200">
+              <input type="radio" name="playbackMode" value="youtube" checked={playbackMode === 'youtube'} onChange={() => setPlaybackMode('youtube')} />
+              YouTube URL
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-200">
+              <input type="radio" name="playbackMode" value="file" checked={playbackMode === 'file'} onChange={() => setPlaybackMode('file')} />
+              動画/音楽ファイル
+            </label>
+            <div className="flex-1 min-w-[280px]">
+              <label className="block text-xs font-bold mb-1 text-gray-500">コンテンツ</label>
+              {playbackMode === 'youtube' ? (
+                <input type="text" className="w-full p-2 border border-gray-300 rounded bg-gray-100/10 text-white" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
+              ) : (
+                <input type="file" accept="audio/*,video/*" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="w-full rounded bg-gray-100/10 text-sm text-gray-200" />
+              )}
+            </div>
+            <div className="w-32">
+              <label className="block text-xs font-bold mb-1 text-gray-500">遅延開始 (秒)</label>
+              <input type="number" min="0" step="0.1" value={syncedDelay} onChange={(e) => setSyncedDelay(Number(e.target.value))} className="w-full p-2 border border-gray-300 bg-gray-100/10 rounded text-white" />
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 items-center">
+            <button onClick={handleSyncPlay} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">同期再生</button>
+            <span className="text-sm text-gray-400">コンテンツを0秒から再生し、{syncedDelay.toFixed(2)}秒後にコード進行アニメーションを開始します。</span>
+          </div>
+          <div className="mt-4">
+            {playbackMode === 'youtube' ? (
+              <div className="w-full max-w-xl bg-black aspect-video" ref={youtubeContainerRef} />
+            ) : fileUrl ? (
+              fileType === 'video' ? (
+                <video ref={mediaRef} src={fileUrl} controls className="w-full max-w-xl bg-black" />
+              ) : (
+                <audio ref={mediaRef} src={fileUrl} controls className="w-full" />
+              )
+            ) : (
+              <div className="text-sm text-gray-400">ファイルを選択するとプレビューが表示されます。</div>
+            )}
           </div>
         </div>
         <div className="mb-4">
@@ -195,16 +561,23 @@ const App = () => {
       <div className="fixed bottom-0 left-0 w-full p-4 bg-transparent border-t border-gray-300">
         <div className="mb-2 text-sm font-bold text-gray-200">生成結果プレビュー</div>
         <div className="relative h-16 w-full flex overflow-hidden">
-          {chords.filter(c => c.when < endTime && (c.when + c.duration) > startTime).map((c, i) => {
-            const left = Math.min(100, Math.max(0, (c.when - startTime) / viewDuration * 100));
-            const width = Math.max(0, Math.min(100 - left, (c.duration / viewDuration) * 100));
-            return (
-              <div key={i} className="absolute top-0 bottom-0 flex items-end p-2 text-2xl font-bold text-white"
-                style={{ left: `${left}%`, width: `${width}%`, backgroundColor: colorThemes[theme][c.chord] || colorThemes[theme].other }}>
-                <span className="misaki-font text-white">{c.key}{formatChord(c.chord)}</span>
-              </div>
-            );
-          })}
+          {(() => {
+            const visibleChords = chords.filter(c => c.when < endTime && (c.when + c.duration) > startTime);
+            let lastColor = null;
+            return visibleChords.map((c, i) => {
+              const left = Math.min(100, Math.max(0, (c.when - startTime) / viewDuration * 100));
+              const width = Math.max(0, Math.min(100 - left, (c.duration / viewDuration) * 100));
+              const color = getChordColor(c, theme, lastColor);
+              lastColor = color;
+              return (
+                <div key={i} className="absolute top-0 bottom-0 p-2 font-bold text-white" style={{ left: `${left}%`, width: `${width}%`, backgroundColor: color }}>
+                  <span className="misaki-font text-white" style={{ position: 'absolute', left: `${textOffsetX}px`, bottom: `${textOffsetY}px`, fontSize: `${textSize}px`, lineHeight: 1 }}>
+                    {c.key}{renderFormattedChord(c.chord)}
+                  </span>
+                </div>
+              );
+            });
+          })()}
           {isReady && <div className="absolute top-0 bottom-0 w-1 bg-white z-10" style={{ left: `${((currentTime - startTime) / viewDuration) * 100}%` }} />}
         </div>
       </div>
