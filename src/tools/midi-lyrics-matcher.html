@@ -110,6 +110,10 @@
 
     <script type="module">
         const STORAGE_KEY_SCALES = 'midi_matcher_scales_v3';
+        const DEFAULT_SCALES = `D5
+G4
+E4
+F3`;
         let g_midiData = null;
 
         const addLog = (msg, type = 'info') => {
@@ -161,7 +165,7 @@
             const clearLogBtn = document.getElementById('clearLogBtn');
 
             const savedScales = localStorage.getItem(STORAGE_KEY_SCALES);
-            if (savedScales) scalesInput.value = savedScales;
+            scalesInput.value = savedScales || DEFAULT_SCALES;
 
             clearLogBtn.onclick = () => {
                 document.getElementById('logContainer').innerHTML = '<div class="text-gray-400 italic">待機中...</div>';
