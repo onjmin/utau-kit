@@ -34,7 +34,8 @@
       { id: "pv", name: "歌詞PVメイカー", file: "tools/lyric-pv-maker.html" },
       { id: "midi", name: "MIDI歌詞マッチング", file: "tools/midi-lyrics-matcher.html" },
       { id: "vowel", name: "歌詞の連続音変換ツール", file: "tools/vowel-converter.html" },
-      { id: "chord", name: "コード進行整形ツール", file: "tools/chord-progression-formatter.html" }
+      { id: "chord-formatter", name: "コード進行整形ツール", file: "tools/chord-progression-formatter.html" },
+      { id: "chord-animation", name: "コード進行アニメーションツール", file: "tools/chord-progression-animation-tool.html" }
     ];
 
     const menu = document.getElementById('menu');
@@ -53,7 +54,7 @@
     const defaultTool = tools.find(t => t.id === toolId) || tools[0];
     
     // 初回読み込み時にもキャッシュバスターを付与
-    frame.src = defaultTool.file + `?t=${Date.now()}`;
+    frame.src = `${defaultTool.file}?t=${Date.now()}`;
 
     tools.forEach(tool => {
       const btn = document.createElement('button');
