@@ -588,6 +588,7 @@ const App = () => {
   return (
     <div className="p-6 min-h-screen">
       <h1 className="text-xl font-bold mb-4">コード進行アニメーション</h1>
+      <div className="mb-4 text-xs text-gray-400">コード進行をコピペするなら <a href="https://rechord.cc/" target="_blank" rel="noopener noreferrer" className="underline text-blue-400 hover:text-blue-300">https://rechord.cc/</a> (Rechord.cc) がオススメ</div>
       <div className="flex flex-col gap-4 mb-8">
         <textarea className="w-full p-2 h-32 border border-gray-300 rounded bg-gray-100/10" value={progression} onChange={(e) => setProgression(e.target.value)} />
         <div className="flex flex-col gap-4 p-4 border border-gray-300 rounded bg-gray-100/5">
