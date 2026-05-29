@@ -101,10 +101,22 @@ const degreeHueMap = {
 };
 
 const getIwashiColor = (chordObj, key) => {
-  if (isDegree(chordObj, key, 6) && chordObj.chord === 'm7') {
-    return createColor(200, themeConfig.saturation, 0.3);
+  const degree = getDegree(chordObj, key);
+  const q = chordObj.chord;
+
+  // 1. ベース色相をクオリティで決定
+  let h = qualityToHue(q);
+
+  // 2. ディグリー補正：VI度m7は色相を+30シフト（分析の「特別区別」を再現）
+  if (degree === 6 && q.includes('m7')) {
+    h = (h + 30) % 360;
   }
-  return createColor(qualityToHue(chordObj.chord), themeConfig.saturation, 0.3);
+
+  // 3. ルート音による微調整（色ムラを論理的に再現）
+  const pitch = chordObj.pitch ?? keyToPitch(chordObj.key ?? 'C');
+  h = (h + (pitch % 12) * 2) % 360;
+
+  return createColor(h, themeConfig.saturation, 0.3);
 };
 
 const getBudouColor = (chordObj, key) => {
