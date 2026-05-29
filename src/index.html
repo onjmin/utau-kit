@@ -9,20 +9,23 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex font-sans antialiased">
 
-  <aside class="w-64 border-r border-gray-700/50 p-4 flex flex-col gap-2">
+  <aside class="hidden md:flex w-64 border-r border-gray-700/50 p-4 flex-col gap-2">
     <div class="px-2 py-4 mb-4">
       <h1 class="text-lg font-bold tracking-wider">UTAU-Kit</h1>
       <p class="text-xs text-gray-500">Vocaloid MV Tools</p>
     </div>
-    
+
     <nav id="menu" class="flex flex-col gap-1">
       </nav>
   </aside>
 
-  <main class="flex-1 bg-slate-950">
+  <main class="flex-1 bg-slate-950 flex flex-col">
+    <div class="md:hidden w-full bg-yellow-500/20 border-b border-yellow-500/30 px-4 py-2 text-center text-sm text-yellow-300">
+      このサイトはPCでの閲覧を推奨します。
+    </div>
     <iframe 
       id="tool-frame" 
-      class="w-full h-full border-none" 
+      class="w-full flex-1 border-none" 
       src="about:blank"
     ></iframe>
   </main>
