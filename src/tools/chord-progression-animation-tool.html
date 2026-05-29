@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.1.0/encoding.min.js"></script>
   <style>
     @font-face {
       font-family: '美咲ゴシック';
@@ -214,6 +215,135 @@ Dm7Am7|Dm7Am7|Dm7Am7|Dm7A7Dm7_|
 
 #ChordWiki にさらに詳しい内容を投稿済み。
 #https://ja.chordwiki.org/wiki/sm19635778`;
+
+const ChordDisplay = ({ currentTime, progression, bpm, formatChord }) => {
+  const [chords, setChords] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { parseChords } = await import('https://rpgen3.github.io/piano/mjs/parseChords.mjs');
+        if (!cancelled) setChords(parseChords(progression, bpm));
+      } catch {
+        if (!cancelled) setChords([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [progression, bpm]);
+
+  const getActiveChord = () => {
+    if (!chords || chords.length === 0) return null;
+    for (let i = 0; i < chords.length; i++) {
+      const c = chords[i];
+      if (currentTime >= c.when && currentTime < c.when + c.duration) return c;
+    }
+    return null;
+  };
+
+  const activeChord = getActiveChord();
+  const totalDuration = chords.length > 0
+    ? chords[chords.length - 1].when + chords[chords.length - 1].duration
+    : 0;
+
+  const formatTime = (t) => {
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    const ds = Math.floor((t % 1) * 10);
+    return `${m}:${s.toString().padStart(2, '0')}.${ds}`;
+  };
+
+  const textToExoHex = (str) => {
+    let hex = '';
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      hex += (code & 0xFF).toString(16).padStart(2, '0');
+      hex += ((code >> 8) & 0xFF).toString(16).padStart(2, '0');
+    }
+    return hex.padEnd(4096, '0');
+  };
+
+  const downloadExo = () => {
+    if (!chords || chords.length === 0) return;
+    const fps = 30;
+    const totalFrames = Math.ceil(totalDuration * fps);
+    const lines = ['[exedit]'];
+    lines.push('width=1920');
+    lines.push('height=1080');
+    lines.push('rate=30');
+    lines.push('scale=1');
+    lines.push(`length=${totalFrames}`);
+    lines.push(`edit_Num=${chords.length}`);
+    lines.push('audio=');
+    chords.forEach((c, i) => {
+      const start = Math.round(c.when * fps);
+      const end = Math.max(start, Math.round((c.when + c.duration) * fps) - 1);
+      const text = c.key + formatChord(c.chord);
+      lines.push(`[${i}]`);
+      lines.push(`start=${start}`);
+      lines.push(`end=${end}`);
+      lines.push('layer=1');
+      lines.push('overlay=1');
+      lines.push('_version=1');
+      lines.push('_editor=1');
+      lines.push(`[${i}.0]`);
+      lines.push('_name=テキスト');
+      lines.push('size=64');
+      lines.push('font=MS ゴシック');
+      lines.push('align=1');
+      lines.push('type=0');
+      lines.push('color=255,255,255');
+      lines.push(`text=${textToExoHex(text)}`);
+      lines.push(`[${i}.1]`);
+      lines.push('_name=標準描画');
+      lines.push('X=0.0');
+      lines.push('Y=0.0');
+      lines.push('Z=0.0');
+      lines.push('拡大率=100.00');
+      lines.push('透明度=0.0');
+      lines.push('回転=0.00');
+      lines.push('blend=0');
+    });
+    const content = lines.join('\r\n');
+    const strArray = Encoding.stringToCode(content);
+    const sjisArray = Encoding.convert(strArray, 'SJIS', 'UNICODE');
+    const blob = new Blob([new Uint8Array(sjisArray)], { type: 'text/plain;charset=shift_jis' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chord_progression.exo';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const chordName = activeChord ? activeChord.key + formatChord(activeChord.chord) : null;
+
+  return (
+    <div className="p-4 border border-gray-300 rounded bg-gray-100/5">
+      <div className="flex items-center gap-6">
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-bold text-gray-500 mb-1">現在のコード</div>
+          <div className="misaki-font text-5xl font-bold text-white truncate">
+            {chordName || '---'}
+          </div>
+        </div>
+        <div className="text-right text-xs text-gray-400 whitespace-nowrap">
+          <div>{formatTime(currentTime)}</div>
+          <div>/ {formatTime(totalDuration)}</div>
+        </div>
+        <button
+          onClick={downloadExo}
+          disabled={!chords || chords.length === 0}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:opacity-50 text-white rounded text-sm whitespace-nowrap"
+        >
+          .exo エクスポート
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const App = () => {
   const [progression, setProgression] = useState(initialProgression);
@@ -570,6 +700,12 @@ const App = () => {
           <button onClick={togglePlay} disabled={!isReady} className="px-4 py-1 bg-gray-100/10 hover:bg-gray-100/20 border border-gray-300 rounded disabled:opacity-50">{isPlaying ? "停止" : "再生"}</button>
         </div>
       </div>
+      <ChordDisplay
+        currentTime={currentTime}
+        progression={progression}
+        bpm={bpm}
+        formatChord={formatChord}
+      />
       <div className="fixed bottom-0 left-0 w-full p-4 bg-transparent border-t border-gray-300">
         <div className="mb-2 text-sm font-bold text-gray-200">生成結果プレビュー</div>
         <div className="relative h-16 w-full flex overflow-hidden">
