@@ -368,6 +368,7 @@ const App = () => {
   const [chords, setChords] = useState([]);
   const [isReady, setIsReady] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
+  const [previewBg, setPreviewBg] = useState('bb');
   const startTimeRef = useRef(0);
   const progressBarRef = useRef(null);
   const youtubePlayerRef = useRef(null);
@@ -707,9 +708,15 @@ const App = () => {
         bpm={bpm}
         formatChord={formatChord}
       />
-      <div className="fixed bottom-0 left-0 w-full p-4 bg-transparent border-t border-gray-300">
-        <div className="mb-2 text-sm font-bold text-gray-200">生成結果プレビュー</div>
-        <div className="relative h-16 w-full flex overflow-hidden">
+      <div className="w-full p-4 border-t border-gray-300 rounded bg-gray-100/5">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-sm font-bold text-gray-200">生成結果プレビュー</div>
+          <div className="flex rounded overflow-hidden border border-gray-600">
+            <button onClick={() => setPreviewBg('bb')} className={`px-3 py-1 text-xs ${previewBg === 'bb' ? 'bg-blue-600 text-white' : 'bg-gray-100/10 text-gray-400 hover:bg-gray-100/20'}`}>BB</button>
+            <button onClick={() => setPreviewBg('gb')} className={`px-3 py-1 text-xs ${previewBg === 'gb' ? 'bg-green-600 text-white' : 'bg-gray-100/10 text-gray-400 hover:bg-gray-100/20'}`}>GB</button>
+          </div>
+        </div>
+        <div className={`relative h-16 w-full flex overflow-hidden rounded ${previewBg === 'bb' ? 'bg-blue-600' : 'bg-green-500'}`}>
           {(() => {
             const visibleChords = chords.filter(c => c.when < endTime && (c.when + c.duration) > startTime);
             let lastColor = null;
