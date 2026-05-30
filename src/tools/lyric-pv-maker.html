@@ -8,6 +8,15 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=DotGothic16&family=Hachi+Maru+Pop&family=Kaisei+Decol&family=Noto+Sans+JP&family=Potta+One&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: '美咲ゴシック';
+      src: url('https://cdn.leafscape.be/misaki/misaki_gothic_web.woff2') format("woff2");
+    }
+  </style>
 </head>
 <body class="bg-[#0b0f19] text-slate-100 min-h-screen font-sans">
 
@@ -27,7 +36,7 @@
           <span class="text-xs text-gray-500 px-2 font-medium">背景色(キャプチャ用):</span>
           <button id="btn-bg-blue" onclick="setBgMode('blue')" class="text-xs px-2.5 py-1 rounded transition-colors font-medium bg-blue-600 text-white">BB (青)</button>
           <button id="btn-bg-green" onclick="setBgMode('green')" class="text-xs px-2.5 py-1 rounded transition-colors font-medium hover:bg-gray-100/20">GB (緑)</button>
-          <button id="btn-bg-trans" onclick="setBgMode('transparent')" class="text-xs px-2.5 py-1 rounded transition-colors font-medium hover:bg-gray-100/20">半透明</button>
+          <button id="btn-bg-black" onclick="setBgMode('black')" class="text-xs px-2.5 py-1 rounded transition-colors font-medium hover:bg-gray-100/20">黒</button>
         </div>
 
         <div class="bg-gray-100/10 p-1 rounded-md border border-gray-800 flex items-center gap-1">
@@ -37,6 +46,21 @@
             <option value="1280x720" class="bg-[#0b0f19] text-white" selected>HD (1280x720)</option>
             <option value="854x480" class="bg-[#0b0f19] text-white">SD (854x480)</option>
             <option value="1080x1080" class="bg-[#0b0f19] text-white">1:1 正方形 (1080x1080)</option>
+          </select>
+        </div>
+
+        <div class="bg-gray-100/10 p-1 rounded-md border border-gray-800 flex items-center gap-1">
+          <span class="text-xs text-gray-500 px-2 font-medium">フォント:</span>
+          <select id="font-select" onchange="changeFont()" class="bg-transparent text-xs text-white border-none outline-none pr-2 cursor-pointer font-medium">
+            <option value='"Hiragino Sans", "Yu Gothic", "MS PGothic", sans-serif' class="bg-[#0b0f19] text-white">ゴシック</option>
+            <option value='"Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif' class="bg-[#0b0f19] text-white">明朝</option>
+            <option value='"美咲ゴシック", monospace' class="bg-[#0b0f19] text-white">美咲ゴシック</option>
+            <option value="'Noto Sans JP', sans-serif" class="bg-[#0b0f19] text-white">Noto Sans JP</option>
+            <option value="'Kaisei Decol', serif" class="bg-[#0b0f19] text-white">Kaisei Decol</option>
+            <option value="'DotGothic16', sans-serif" class="bg-[#0b0f19] text-white">DotGothic16</option>
+            <option value="'Dela Gothic One', cursive" class="bg-[#0b0f19] text-white">Dela Gothic One</option>
+            <option value="'Potta One', cursive" class="bg-[#0b0f19] text-white">Potta One</option>
+            <option value="'Hachi Maru Pop', cursive" class="bg-[#0b0f19] text-white">Hachi Maru Pop</option>
           </select>
         </div>
       </div>
@@ -399,7 +423,8 @@ L[01:00.85]青い白いロゴ`;
     // --- 各種状態パラメータ ---
     let lyricsText = defaultLyrics;
     let parsedLines = [];
-    let bgMode = 'blue'; // blue | green | transparent
+    let bgMode = 'blue'; // blue | green | black
+    let selectedFont = "'Noto Sans JP', sans-serif";
     let currentTime = 0;
     let duration = 120; // 仮想の楽曲時間 (秒)
     let isPlaying = false;
@@ -501,7 +526,7 @@ L[01:00.85]青い白いロゴ`;
       const buttons = {
         blue: document.getElementById('btn-bg-blue'),
         green: document.getElementById('btn-bg-green'),
-        transparent: document.getElementById('btn-bg-trans')
+        black: document.getElementById('btn-bg-black')
       };
 
       Object.keys(buttons).forEach(key => {
@@ -514,6 +539,12 @@ L[01:00.85]青い白いロゴ`;
         }
       });
 
+      draw();
+    }
+
+    // フォント切替
+    function changeFont() {
+      selectedFont = document.getElementById('font-select').value;
       draw();
     }
 
@@ -885,17 +916,9 @@ L[01:00.85]青い白いロゴ`;
       } else if (bgMode === 'green') {
         ctx.fillStyle = '#00FF00';
         ctx.fillRect(0, 0, w, h);
-      } else {
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.4)';
+      } else if (bgMode === 'black') {
+        ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = 'rgba(255,255,255,0.02)';
-        const size = 30;
-        for (let x = 0; x < w; x += size * 2) {
-          for (let y = 0; y < h; y += size * 2) {
-            ctx.fillRect(x, y, size, size);
-            ctx.fillRect(x + size, y + size, size, size);
-          }
-        }
       }
 
       // 現在時間のアクティブ行取得
@@ -926,7 +949,7 @@ L[01:00.85]青い白いロゴ`;
         
         // --- 1. 緩急・スライド系 (A〜D) ---
         case 'A': { // Delay Slide (弾むスライド)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -949,7 +972,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'B': { // Horizontal Squash (横伸び高速入場)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -983,7 +1006,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'C': { // Vertical Drop (叩きつけ落下)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1016,7 +1039,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'D': { // Roll Jump (ローリング入場)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1048,7 +1071,7 @@ L[01:00.85]青い白いロゴ`;
 
         // --- 2. 歪み・グリッチ系 (E〜H) ---
         case 'E': { // Chromatic Typewriter (色収差タイピング)
-          ctx.font = "bold 64px monospace";
+          ctx.font = `bold 64px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1085,7 +1108,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'F': { // Inversion Flash (輝度反転ストロボ)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1105,7 +1128,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'G': { // Liquid Raster (水面ゆらぎ)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1125,7 +1148,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'H': { // Turbulent Noise (有機的熱気)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1144,7 +1167,7 @@ L[01:00.85]青い白いロゴ`;
 
         // --- 3. クリッピング・幾何学系 (I〜L) ---
         case 'I': { // Parts Converge (斜めパーツ収束)
-          ctx.font = "bold 72px sans-serif";
+          ctx.font = `bold 72px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1177,7 +1200,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'J': { // Grid Wipe (格子スライススピン出現)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1211,7 +1234,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'K': { // Stripe Slash (すれ違い合体)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1239,7 +1262,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'L': { // Wave Reveal (波形ワイプ出現 - 文字領域マスク再設計)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1277,7 +1300,7 @@ L[01:00.85]青い白いロゴ`;
 
         // --- 4. 回転・立体表現系 (M〜O) ---
         case 'M': { // 3D Layer Spin (擬似3D軸回転)
-          ctx.font = "bold 64px sans-serif";
+          ctx.font = `bold 64px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1307,7 +1330,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'N': { // Ghost Ripple (残像置き去り)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1328,7 +1351,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'O': { // Text Wave (文字の波紋ストローク拡散)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1362,7 +1385,7 @@ L[01:00.85]青い白いロゴ`;
           ctx.translate(centerX, centerY);
           ctx.scale(scale, scale);
 
-          ctx.font = "bold 76px sans-serif"; // 潰れを防ぐために88pxから76pxへ縮小
+          ctx.font = `bold 76px ${selectedFont}`; // 潰れを防ぐために88pxから76pxへ縮小
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1374,7 +1397,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'Q': { // 4-Color Gradient (液体グラデーション)
-          ctx.font = "bold 76px sans-serif";
+          ctx.font = `bold 76px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1397,7 +1420,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'R': { // Neon Glow (発光グロス)
-          ctx.font = "bold 70px sans-serif";
+          ctx.font = `bold 70px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1413,7 +1436,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'S': { // Yin-Yang Split (陰陽境界反転)
-          ctx.font = "bold 70px sans-serif";
+          ctx.font = `bold 70px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1442,7 +1465,7 @@ L[01:00.85]青い白いロゴ`;
 
         // --- 6. 破壊・粒子系 (T〜V) ---
         case 'T': { // Orbit Particle (粒子らせん収束)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1470,7 +1493,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'U': { // Shatter Reverse (破片巻き戻し)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1501,7 +1524,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'V': { // Pixel Dissolve (累積ドット出現 - オフスクリーンCanvasバッファ合成方式で背景破壊を完全に防ぐ)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1554,7 +1577,7 @@ L[01:00.85]青い白いロゴ`;
 
         // --- 7. 実用・インターフェース系 (W〜Z) ---
       case 'W': { // Constant Terminal (等速カーソル)
-          ctx.font = "bold 54px monospace";
+          ctx.font = `bold 54px ${selectedFont}`;
           // 1. 左揃えに変更
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
@@ -1581,7 +1604,7 @@ L[01:00.85]青い白いロゴ`;
         }
         
         case 'X': { // Morse Flicker (不規則点滅)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1600,7 +1623,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'Y': { // Laser Scan (拡張焼き付け)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
@@ -1630,7 +1653,7 @@ L[01:00.85]青い白いロゴ`;
         }
 
         case 'Z': { // Zero Gravity (手振れ浮遊)
-          ctx.font = "bold 68px sans-serif";
+          ctx.font = `bold 68px ${selectedFont}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
