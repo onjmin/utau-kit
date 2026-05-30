@@ -32,9 +32,31 @@
       </nav>
   </aside>
 
+  <!-- Mobile drawer backdrop -->
+  <div id="drawer-overlay" class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 hidden opacity-0 md:hidden"></div>
+
+  <!-- Mobile drawer -->
+  <aside id="drawer" class="fixed top-0 left-0 h-full w-64 bg-slate-900 border-r border-gray-700/50 z-50 -translate-x-full transition-transform duration-300 ease-in-out md:hidden flex flex-col">
+    <div class="flex items-center justify-between px-4 py-4 border-b border-gray-700/50">
+      <div>
+        <div class="text-lg font-bold tracking-wider">UTAU-Kit</div>
+        <p class="text-xs text-gray-500">Vocaloid MV Tools</p>
+      </div>
+      <button id="drawer-close" class="p-1.5 rounded-md hover:bg-gray-100/20 transition-colors" aria-label="メニューを閉じる">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <nav id="drawer-menu" class="flex-1 p-4 flex flex-col gap-1 overflow-y-auto">
+      </nav>
+  </aside>
+
   <main class="flex-1 bg-slate-950 flex flex-col">
-    <div class="md:hidden w-full bg-yellow-500/20 border-b border-yellow-500/30 px-4 py-2 text-center text-sm text-yellow-300">
-      このサイトはPCでの閲覧を推奨します。
+    <div class="md:hidden flex items-center justify-between bg-slate-900 border-b border-gray-700/50 px-4 py-2 gap-2">
+      <button id="menu-toggle" class="p-1.5 rounded-md hover:bg-gray-100/20 transition-colors shrink-0" aria-label="メニューを開く">
+        <i data-lucide="menu" class="w-6 h-6"></i>
+      </button>
+      <span class="text-sm font-bold tracking-wider shrink-0">UTAU-Kit</span>
+      <span class="text-[10px] text-yellow-400/70 text-right leading-tight">PCでの閲覧を推奨</span>
     </div>
     <iframe 
       id="tool-frame" 
@@ -45,41 +67,94 @@
 
   <script>
     const tools = [
-      { id: "lrc", name: "LRC歌詞エディター", file: "tools/lrc-tagger.html" },
       { id: "dot", name: "ドットフェードGIF生成", file: "tools/dot-fade-gif-generator.html" },
-      { id: "pv", name: "歌詞PVメイカー", file: "tools/lyric-pv-maker.html" },
       { id: "midi", name: "MIDI歌詞マッチング", file: "tools/midi-lyrics-matcher.html" },
       { id: "vowel", name: "歌詞の連続音変換ツール", file: "tools/vowel-converter.html" },
+      { id: "lrc", name: "LRC歌詞エディター", file: "tools/lrc-tagger.html" },
+      { id: "pv", name: "歌詞PVメイカー", file: "tools/lyric-pv-maker.html" },
       { id: "chord-formatter", name: "コード進行整形ツール", file: "tools/chord-progression-formatter.html" },
       { id: "chord-animation", name: "コード進行アニメーションツール", file: "tools/chord-progression-animation-tool.html" }
     ];
 
     const menu = document.getElementById('menu');
+    const drawerMenu = document.getElementById('drawer-menu');
     const frame = document.getElementById('tool-frame');
 
-    // ツール切り替え関数
     const loadTool = (tool) => {
-      // キャッシュバスター（タイムスタンプ）を付与
       const cacheBuster = `?t=${Date.now()}`;
       frame.src = tool.file + cacheBuster;
       history.pushState(null, "", `?tool=${tool.id}`);
+      setActiveByToolId(tool.id);
     };
-    
+
     const params = new URLSearchParams(window.location.search);
     const toolId = params.get('tool');
-    const defaultTool = tools.find(t => t.id === toolId) || tools[0];
-    
-    // 初回読み込み時にもキャッシュバスターを付与
+    const defaultTool = tools.find(t => t.id === toolId) || tools.find(v => v.id === 'chord-animation');
+
     frame.src = `${defaultTool.file}?t=${Date.now()}`;
 
+    const drawer = document.getElementById('drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    let drawerOpen = false;
+
+    const openDrawer = () => {
+      drawerOpen = true;
+      drawer.classList.remove('-translate-x-full');
+      overlay.classList.remove('hidden');
+      requestAnimationFrame(() => overlay.classList.remove('opacity-0'));
+      document.body.style.overflow = 'hidden';
+    };
+
+    const closeDrawer = () => {
+      drawerOpen = false;
+      drawer.classList.add('-translate-x-full');
+      overlay.classList.add('opacity-0');
+      setTimeout(() => overlay.classList.add('hidden'), 300);
+      document.body.style.overflow = '';
+    };
+
+    const toggleDrawer = () => {
+      if (drawerOpen) closeDrawer();
+      else openDrawer();
+    };
+
+    const setActiveByToolId = (id) => {
+      document.querySelectorAll('#menu button, #drawer-menu button').forEach(btn => {
+        if (btn.dataset.toolId === id) {
+          btn.className = "w-full text-left px-3 py-2 rounded-md transition-colors bg-sky-700/50 hover:bg-sky-700/60 text-sky-200 text-sm";
+        } else {
+          btn.className = "w-full text-left px-3 py-2 rounded-md transition-colors bg-gray-100/10 hover:bg-gray-100/20 text-sm";
+        }
+      });
+    };
+
     tools.forEach(tool => {
-      const btn = document.createElement('button');
-      btn.className = "w-full text-left px-3 py-2 rounded-md transition-colors bg-gray-100/10 hover:bg-gray-100/20 text-sm";
-      btn.textContent = tool.name;
-      btn.onclick = () => loadTool(tool);
-      menu.appendChild(btn);
+      const createBtn = (container) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left px-3 py-2 rounded-md transition-colors bg-gray-100/10 hover:bg-gray-100/20 text-sm";
+        btn.textContent = tool.name;
+        btn.dataset.toolId = tool.id;
+        btn.onclick = () => {
+          loadTool(tool);
+          closeDrawer();
+        };
+        container.appendChild(btn);
+      };
+      createBtn(menu);
+      createBtn(drawerMenu);
     });
-    
+
+    setActiveByToolId(defaultTool.id);
+
+    document.getElementById('menu-toggle').addEventListener('click', toggleDrawer);
+    document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+    overlay.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drawerOpen) closeDrawer();
+    });
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
     frame.src = defaultTool.file;
   </script>
 </body>
