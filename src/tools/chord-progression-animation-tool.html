@@ -368,7 +368,7 @@ const App = () => {
   const [chords, setChords] = useState([]);
   const [isReady, setIsReady] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const [previewBg, setPreviewBg] = useState('bb');
+  const [previewBg, setPreviewBg] = useState('b');
   const startTimeRef = useRef(0);
   const progressBarRef = useRef(null);
   const youtubePlayerRef = useRef(null);
@@ -712,11 +712,12 @@ const App = () => {
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-bold text-gray-200">生成結果プレビュー</div>
           <div className="flex rounded overflow-hidden border border-gray-600">
-            <button onClick={() => setPreviewBg('bb')} className={`px-3 py-1 text-xs ${previewBg === 'bb' ? 'bg-blue-600 text-white' : 'bg-gray-100/10 text-gray-400 hover:bg-gray-100/20'}`}>BB</button>
-            <button onClick={() => setPreviewBg('gb')} className={`px-3 py-1 text-xs ${previewBg === 'gb' ? 'bg-green-600 text-white' : 'bg-gray-100/10 text-gray-400 hover:bg-gray-100/20'}`}>GB</button>
+            <button onClick={() => setPreviewBg('r')} className={`px-3 py-1 text-xs ${previewBg === 'r' ? 'bg-red-600 text-white' : 'bg-gray-100/10 text-gray-400 hover:bg-gray-100/20'}`}>R</button>
+            <button onClick={() => setPreviewBg('g')} className={`px-3 py-1 text-xs ${previewBg === 'g' ? 'bg-green-600 text-white' : 'bg-gray-100/10 text-gray-400 hover:bg-gray-100/20'}`}>G</button>
+            <button onClick={() => setPreviewBg('b')} className={`px-3 py-1 text-xs ${previewBg === 'b' ? 'bg-blue-600 text-white' : 'bg-gray-100/10 text-gray-400 hover:bg-gray-100/20'}`}>B</button>
           </div>
         </div>
-        <div className={`relative h-16 w-full flex overflow-hidden rounded ${previewBg === 'bb' ? 'bg-blue-600' : 'bg-green-500'}`}>
+        <div className="relative h-16 w-full flex overflow-hidden rounded" style={{ backgroundColor: previewBg === 'r' ? '#FF0000' : previewBg === 'g' ? '#00FF00' : '#0000FF' }}>
           {(() => {
             const visibleChords = chords.filter(c => c.when < endTime && (c.when + c.duration) > startTime);
             let lastColor = null;
