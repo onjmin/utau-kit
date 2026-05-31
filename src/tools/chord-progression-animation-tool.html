@@ -263,14 +263,14 @@ const ChordDisplay = ({ currentTime, progression, bpm, formatChord }) => {
     return hex.padEnd(4096, '0');
   };
 
+  const [fps, setFps] = useState(30);
   const downloadExo = () => {
     if (!chords || chords.length === 0) return;
-    const fps = 30;
     const totalFrames = Math.ceil(totalDuration * fps);
     const lines = ['[exedit]'];
     lines.push('width=1920');
     lines.push('height=1080');
-    lines.push('rate=30');
+    lines.push(`rate=${fps}`);
     lines.push('scale=1');
     lines.push(`length=${totalFrames}`);
     lines.push(`edit_Num=${chords.length}`);
@@ -280,8 +280,8 @@ const ChordDisplay = ({ currentTime, progression, bpm, formatChord }) => {
       const end = Math.max(start, Math.round((c.when + c.duration) * fps) - 1);
       const text = c.key + formatChord(c.chord);
       lines.push(`[${i}]`);
-      lines.push(`start=${start}`);
-      lines.push(`end=${end}`);
+      lines.push(`start=${start + 1}`);
+      lines.push(`end=${end + 1}`);
       lines.push('layer=1');
       lines.push('overlay=1');
       lines.push('_version=1');
@@ -322,7 +322,7 @@ const ChordDisplay = ({ currentTime, progression, bpm, formatChord }) => {
 
   return (
     <div className="p-4 border border-gray-300 rounded bg-gray-100/5">
-      <div className="flex items-center gap-6">
+      <div className="flex flex-wrap items-center gap-4">
         <div className="flex-1 min-w-0">
           <div className="text-xs font-bold text-gray-500 mb-1">現在のコード</div>
           <div className="misaki-font text-5xl font-bold text-white truncate">
@@ -332,6 +332,10 @@ const ChordDisplay = ({ currentTime, progression, bpm, formatChord }) => {
         <div className="text-right text-xs text-gray-400 whitespace-nowrap">
           <div>{formatTime(currentTime)}</div>
           <div>/ {formatTime(totalDuration)}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">FPS</label>
+          <input type="number" min="1" max="120" value={fps} onChange={(e) => setFps(Number(e.target.value))} className="w-16 p-1 border border-gray-300 bg-gray-100/10 rounded text-white text-sm" />
         </div>
         <button
           onClick={downloadExo}
@@ -354,7 +358,7 @@ const App = () => {
   const [textOffsetY, setTextOffsetY] = useState(-4);
   const [textSize, setTextSize] = useState(38);
   const [triangleScale, setTriangleScale] = useState(0.78);
-  const [playbackMode, setPlaybackMode] = useState("youtube");
+  const [playbackMode, setPlaybackMode] = useState("url");
   const [youtubeUrl, setYoutubeUrl] = useState("https://www.youtube.com/watch?v=d_T1StgldnM");
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileUrl, setFileUrl] = useState("");
@@ -408,7 +412,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!youtubeApiReady || playbackMode !== 'youtube' || !youtubeContainerRef.current) return;
+    if (!youtubeApiReady || playbackMode !== 'url' || !youtubeContainerRef.current) return;
     const videoId = parseYouTubeId(youtubeUrl);
     if (!videoId) return;
     if (youtubePlayerRef.current) {
@@ -441,18 +445,23 @@ const App = () => {
   }, [youtubeApiReady, playbackMode, youtubeUrl, youtubePlayerReady]);
 
   useEffect(() => {
-    if (!selectedFile) {
-      setFileUrl('');
+    if (playbackMode === 'file' && selectedFile) {
+      const url = URL.createObjectURL(selectedFile);
+      setFileUrl(url);
+      setFileType(selectedFile.type.startsWith('video/') ? 'video' : 'audio');
+      return () => URL.revokeObjectURL(url);
+    }
+    if (playbackMode === 'url' && youtubeUrl && !parseYouTubeId(youtubeUrl)) {
+      setFileUrl(youtubeUrl);
+      const ext = youtubeUrl.split('.').pop().toLowerCase();
+      setFileType(['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext) ? 'video' : 'audio');
       return;
     }
-    const url = URL.createObjectURL(selectedFile);
-    setFileUrl(url);
-    setFileType(selectedFile.type.startsWith('video/') ? 'video' : 'audio');
-    return () => URL.revokeObjectURL(url);
-  }, [selectedFile]);
+    setFileUrl('');
+  }, [playbackMode, selectedFile, youtubeUrl]);
 
   const seekAndPlayMedia = async () => {
-    if (playbackMode === 'youtube') {
+    if (playbackMode === 'url' && parseYouTubeId(youtubeUrl)) {
       if (!youtubePlayerReady || !youtubePlayerRef.current) return false;
       try {
         youtubePlayerRef.current.seekTo(0, true);
@@ -593,7 +602,7 @@ const App = () => {
       <div className="flex flex-col gap-4 mb-8">
         <textarea className="w-full p-2 h-32 border border-gray-300 rounded bg-gray-100/10" value={progression} onChange={(e) => setProgression(e.target.value)} />
         <div className="flex flex-col gap-4 p-4 border border-gray-300 rounded bg-gray-100/5">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div>
               <label className="block text-xs font-bold mb-1 text-gray-500">BPM</label>
               <input type="number" value={bpm} onChange={(e) => setBpm(Number(e.target.value))} className="w-20 p-1 border border-gray-300 bg-gray-100/10 rounded" />
@@ -630,9 +639,9 @@ const App = () => {
               <div className="text-xs text-gray-400">{Math.round(triangleScale * 100)}%</div>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div className="flex flex-wrap gap-4">
             {Object.entries(notationMaps).map(([type, { label, options }]) => (
-              <div key={type}>
+              <div key={type} className="min-w-[100px] flex-1">
                 <label className="block text-xs font-bold mb-1 text-gray-500">{label}</label>
                 <select value={notation[type]} onChange={(e) => setNotation({...notation, [type]: e.target.value})} className="w-full p-1 border border-gray-300 bg-white text-black rounded">
                   {Object.entries(options).map(([key, val]) => (
@@ -647,8 +656,8 @@ const App = () => {
           <div className="mb-3 font-bold text-gray-200">同期再生設定</div>
           <div className="flex flex-wrap gap-4 items-end">
             <label className="flex items-center gap-2 text-sm text-gray-200">
-              <input type="radio" name="playbackMode" value="youtube" checked={playbackMode === 'youtube'} onChange={() => setPlaybackMode('youtube')} />
-              YouTube URL
+              <input type="radio" name="playbackMode" value="url" checked={playbackMode === 'url'} onChange={() => setPlaybackMode('url')} />
+              URLから再生
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-200">
               <input type="radio" name="playbackMode" value="file" checked={playbackMode === 'file'} onChange={() => setPlaybackMode('file')} />
@@ -656,24 +665,28 @@ const App = () => {
             </label>
             <div className="flex-1 min-w-[280px]">
               <label className="block text-xs font-bold mb-1 text-gray-500">コンテンツ</label>
-              {playbackMode === 'youtube' ? (
+              {playbackMode === 'url' ? (
                 <input type="text" className="w-full p-2 border border-gray-300 rounded bg-gray-100/10 text-white" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
               ) : (
                 <input type="file" accept="audio/*,video/*" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="w-full rounded bg-gray-100/10 text-sm text-gray-200" />
               )}
             </div>
-            <div className="w-32">
-              <label className="block text-xs font-bold mb-1 text-gray-500">遅延開始 (秒)</label>
-              <input type="number" min="0" step="0.1" value={syncedDelay} onChange={(e) => setSyncedDelay(Number(e.target.value))} className="w-full p-2 border border-gray-300 bg-gray-100/10 rounded text-white" />
-            </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2 items-center">
             <button onClick={handleSyncPlay} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">同期再生</button>
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-gray-400 whitespace-nowrap">遅延開始</label>
+              <input type="number" min="0" step="0.1" value={syncedDelay} onChange={(e) => setSyncedDelay(Number(e.target.value))} className="w-16 p-1 border border-gray-300 bg-gray-100/10 rounded text-white text-sm" />
+              <span className="text-xs text-gray-400">秒</span>
+            </div>
             <span className="text-sm text-gray-400">コンテンツを0秒から再生し、{syncedDelay.toFixed(2)}秒後にコード進行アニメーションを開始します。</span>
           </div>
           <div className="mt-4">
-            {playbackMode === 'youtube' ? (
-              <div className="w-full max-w-xl bg-black aspect-video" ref={youtubeContainerRef} />
+            {playbackMode === 'url' && parseYouTubeId(youtubeUrl) ? (
+              <div className="w-full max-w-xl">
+                <div className="bg-black aspect-video" ref={youtubeContainerRef} />
+                <p className="text-xs text-yellow-400 mt-1">埋め込み内の動画の再生を開始してから「同期再生」ボタンを押してください</p>
+              </div>
             ) : fileUrl ? (
               fileType === 'video' ? (
                 <video ref={mediaRef} src={fileUrl} controls className="w-full max-w-xl bg-black" />
@@ -681,7 +694,7 @@ const App = () => {
                 <audio ref={mediaRef} src={fileUrl} controls className="w-full" />
               )
             ) : (
-              <div className="text-sm text-gray-400">ファイルを選択するとプレビューが表示されます。</div>
+              <div className="text-sm text-gray-400">URLまたはファイルを指定するとプレビューが表示されます。</div>
             )}
           </div>
         </div>
