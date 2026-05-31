@@ -416,7 +416,7 @@ const App = () => {
     const videoId = parseYouTubeId(youtubeUrl);
     if (!videoId) return;
     if (youtubePlayerRef.current) {
-      if (window.YT && youtubePlayerReady) {
+      if (window.YT) {
         youtubePlayerRef.current.loadVideoById({ videoId, startSeconds: 0 });
       }
       return;
@@ -433,16 +433,19 @@ const App = () => {
     });
 
     return () => {
-      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.destroy === 'function') {
+      if (youtubePlayerRef.current) {
         try {
           youtubePlayerRef.current.destroy();
         } catch (e) {
-          console.warn('Failed to destroy YouTube player:', e);
+          console.warn('Player destroy error:', e);
         }
         youtubePlayerRef.current = null;
       }
+      if (youtubeContainerRef.current) {
+        youtubeContainerRef.current.innerHTML = '';
+      }
     };
-  }, [youtubeApiReady, playbackMode, youtubeUrl, youtubePlayerReady]);
+  }, [youtubeApiReady, playbackMode, youtubeUrl]);
 
   useEffect(() => {
     if (playbackMode === 'file' && selectedFile) {
@@ -682,19 +685,20 @@ const App = () => {
             <span className="text-sm text-gray-400">コンテンツを0秒から再生し、{syncedDelay.toFixed(2)}秒後にコード進行アニメーションを開始します。</span>
           </div>
           <div className="mt-4">
-            {playbackMode === 'url' && parseYouTubeId(youtubeUrl) ? (
-              <div className="w-full max-w-xl">
-                <div className="bg-black aspect-video" ref={youtubeContainerRef} />
-                <p className="text-xs text-yellow-400 mt-1">埋め込み内の動画の再生を開始してから「同期再生」ボタンを押してください</p>
-              </div>
-            ) : fileUrl ? (
-              fileType === 'video' ? (
-                <video ref={mediaRef} src={fileUrl} controls className="w-full max-w-xl bg-black" />
+            <div className="w-full max-w-xl" style={{ display: playbackMode === 'url' && parseYouTubeId(youtubeUrl) ? '' : 'none' }}>
+              <div className="bg-black aspect-video" ref={youtubeContainerRef} />
+              <p className="text-xs text-yellow-400 mt-1">埋め込み内の動画の再生を開始してから「同期再生」ボタンを押してください</p>
+            </div>
+            {!(playbackMode === 'url' && parseYouTubeId(youtubeUrl)) && (
+              fileUrl ? (
+                fileType === 'video' ? (
+                  <video ref={mediaRef} src={fileUrl} controls className="w-full max-w-xl bg-black" />
+                ) : (
+                  <audio ref={mediaRef} src={fileUrl} controls className="w-full" />
+                )
               ) : (
-                <audio ref={mediaRef} src={fileUrl} controls className="w-full" />
+                <div className="text-sm text-gray-400">URLまたはファイルを指定するとプレビューが表示されます。</div>
               )
-            ) : (
-              <div className="text-sm text-gray-400">URLまたはファイルを指定するとプレビューが表示されます。</div>
             )}
           </div>
         </div>
