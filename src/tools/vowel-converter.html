@@ -5,27 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>歌詞の連続音変換ツール</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://colxi.info/midi-parser-js/src/main.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
     <div class="max-w-3xl mx-auto">
         <h1 class="text-xl font-bold mb-4">歌詞の連続音変換ツール</h1>
-        
+
         <div class="flex flex-col gap-4">
-            <!-- 入力エリア -->
             <div class="flex flex-col gap-2">
                 <label class="font-medium">変換元データ (一括入力形式)</label>
-                <textarea id="input" rows="6" 
+                <textarea id="input" rows="6"
                     class="w-full p-3 rounded-md border border-gray-300 bg-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder='"- よ_E4" "- な_E4" "- か_F3" ...'></textarea>
             </div>
 
-            <!-- 操作ボタン -->
-            <button id="convertBtn" 
+            <details class="border border-gray-300 rounded-md p-3 bg-white/30">
+                <summary class="cursor-pointer font-medium text-sm text-gray-600 select-none">MIDI / UST で休符補正（オプション）</summary>
+                <div class="mt-3 space-y-3">
+                    <div>
+                        <input type="file" id="fileInput" accept=".mid,.ust"
+                            class="w-full text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-400 file:text-sm file:font-semibold file:bg-white file:text-gray-700 hover:file:bg-gray-50 cursor-pointer">
+                    </div>
+                    <div id="trackSelectorArea" class="hidden flex items-center gap-3">
+                        <label class="text-sm font-medium">トラック:</label>
+                        <select id="trackSelect" class="p-1.5 rounded border border-gray-300 text-sm bg-white"></select>
+                        <span id="restIndicator" class="text-xs text-gray-400 hidden">休符補正: ON</span>
+                    </div>
+                    <div id="thresholdArea" class="hidden flex items-center gap-3">
+                        <label class="text-sm text-gray-500">MIDI休符判定しきい値 (ticks):</label>
+                        <input id="thresholdInput" type="number" value="240" min="1" max="960" class="w-20 p-1 rounded border border-gray-300 text-sm">
+                    </div>
+                </div>
+            </details>
+
+            <button id="convertBtn"
                 class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors font-medium">
                 変換してコピー
             </button>
 
-            <!-- 出力エリア -->
             <div class="flex flex-col gap-2">
                 <label class="font-medium">変換結果</label>
                 <textarea id="output" rows="6" readonly
@@ -35,11 +52,11 @@
     </div>
 
     <script>
-        /**
-         * ひらがなから母音を取得する関数
-         * @param {string} kana 
-         * @returns {string|null}
-         */
+        let g_midiData = null;
+        let g_ustSections = null;
+        let g_isUST = false;
+        let g_restGaps = null;
+
         function kanaToVowel(kana) {
             if (/[ゃャ]/.test(kana)) return "a";
             if (/[ゅュ]/.test(kana)) return "u";
@@ -52,6 +69,147 @@
             return null;
         }
 
+        function parseUST(text) {
+            const sections = [];
+            let current = {};
+            let inNote = false;
+            for (const line of text.split('\n')) {
+                if (/^\[#\d+\]$/.test(line.trim())) {
+                    if (inNote && Object.keys(current).length > 0) sections.push({ ...current });
+                    current = {};
+                    inNote = true;
+                } else if (inNote) {
+                    const idx = line.indexOf('=');
+                    if (idx > 0) current[line.substring(0, idx).trim()] = line.substring(idx + 1).trim();
+                }
+            }
+            if (inNote && Object.keys(current).length > 0) sections.push({ ...current });
+            return sections;
+        }
+
+        function getRestGapsFromUST(sections) {
+            const noteSections = sections.filter(s => s.Lyric !== undefined);
+            const restGaps = [];
+            let prevSung = -1;
+            for (let i = 0; i < noteSections.length; i++) {
+                const s = noteSections[i];
+                const nn = parseInt(s.NoteNum);
+                if (s.Lyric !== 'R' && nn > 0) {
+                    if (prevSung >= 0) {
+                        let hasRest = false;
+                        for (let j = prevSung + 1; j < i; j++) {
+                            if (noteSections[j].Lyric === 'R') { hasRest = true; break; }
+                        }
+                        restGaps.push(hasRest);
+                    }
+                    prevSung = i;
+                }
+            }
+            return restGaps;
+        }
+
+        function getRestGapsFromMIDI(track, threshold) {
+            const noteOns = [];
+            let absPos = 0;
+            for (const ev of track.event) {
+                absPos += ev.delta;
+                if (ev.type === 9 && ev.data && ev.data[1] > 0) {
+                    noteOns.push(absPos);
+                }
+            }
+            const restGaps = [];
+            for (let i = 0; i < noteOns.length - 1; i++) {
+                restGaps.push((noteOns[i + 1] - noteOns[i]) > threshold);
+            }
+            return restGaps;
+        }
+
+        function resetFileData() {
+            g_midiData = null;
+            g_ustSections = null;
+            g_isUST = false;
+            g_restGaps = null;
+            document.getElementById('trackSelectorArea').classList.add('hidden');
+            document.getElementById('thresholdArea').classList.add('hidden');
+            document.getElementById('restIndicator').classList.add('hidden');
+            document.getElementById('trackSelect').innerHTML = '';
+        }
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            resetFileData();
+
+            const isUST = file.name.toLowerCase().endsWith('.ust');
+            g_isUST = isUST;
+
+            if (isUST) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const sections = parseUST(ev.target.result);
+                    const sungNotes = sections.filter(s => s.Lyric !== undefined && s.Lyric !== 'R' && parseInt(s.NoteNum) > 0);
+                    if (sungNotes.length === 0) { alert('USTファイルに有効な音符が見つかりません。'); return; }
+                    g_ustSections = sections;
+                    const sel = document.getElementById('trackSelect');
+                    const opt = document.createElement('option');
+                    opt.value = 0;
+                    opt.textContent = `UST Notes (${sungNotes.length} notes)`;
+                    sel.appendChild(opt);
+                    document.getElementById('trackSelectorArea').classList.remove('hidden');
+                    document.getElementById('restIndicator').classList.remove('hidden');
+                    g_restGaps = getRestGapsFromUST(sections);
+                    document.getElementById('restIndicator').textContent = `休符補正: ON (${g_restGaps.filter(Boolean).length}箇所)`;
+                };
+                reader.readAsText(file);
+            } else {
+                try {
+                    window.MidiParser.parse(document.getElementById('fileInput'), (obj) => {
+                        if (!obj?.track) { alert('MIDIファイルの解析に失敗しました。'); return; }
+                        g_midiData = obj;
+                        const sel = document.getElementById('trackSelect');
+                        let found = false;
+                        obj.track.forEach((t, i) => {
+                            const cnt = t.event ? t.event.filter(ev => ev.type === 9 && ev.data && ev.data[1] > 0).length : 0;
+                            if (cnt > 0) {
+                                const opt = document.createElement('option');
+                                opt.value = i;
+                                opt.textContent = `Track ${i} (${cnt} notes)`;
+                                sel.appendChild(opt);
+                                found = true;
+                            }
+                        });
+                        if (!found) { alert('音符が含まれるトラックがありません。'); return; }
+                        document.getElementById('trackSelectorArea').classList.remove('hidden');
+                        document.getElementById('thresholdArea').classList.remove('hidden');
+                        applyMIDIRestGaps();
+                    });
+                } catch (err) {
+                    alert('MIDI解析エラー: ' + err.message);
+                }
+            }
+        });
+
+        function applyMIDIRestGaps() {
+            if (!g_midiData) return;
+            const trackIdx = document.getElementById('trackSelect').value;
+            if (trackIdx === '') return;
+            const threshold = parseInt(document.getElementById('thresholdInput').value) || 240;
+            g_restGaps = getRestGapsFromMIDI(g_midiData.track[trackIdx], threshold);
+            const indicator = document.getElementById('restIndicator');
+            indicator.classList.remove('hidden');
+            indicator.textContent = `休符補正: ON (${g_restGaps.filter(Boolean).length}箇所)`;
+        }
+
+        document.getElementById('trackSelect').addEventListener('change', () => {
+            if (g_isUST) return;
+            applyMIDIRestGaps();
+        });
+
+        document.getElementById('thresholdInput').addEventListener('change', () => {
+            if (g_isUST) return;
+            applyMIDIRestGaps();
+        });
+
         document.getElementById('convertBtn').addEventListener('click', () => {
             const inputEl = document.getElementById('input');
             const outputEl = document.getElementById('output');
@@ -63,33 +221,30 @@
             }
 
             try {
-                // 文字列からデータを抽出
                 const data = inputVal.match(/"[^"]+"/g).map(s => s.slice(1, -1));
                 const result = [...data];
 
-                // 変換ロジック
-                for (let i = 0; i < data.length - 1; i++) {
-                    const cur = data[i];
-                    const next = data[i + 1];
-
-                    const curMatch = cur.match(/^[-aiueo?]\s(.+?)_/);
-                    if (!curMatch) continue;
-
-                    const vowel = kanaToVowel(curMatch[1]);
-                    if (!vowel) continue;
-
-                    if (!next.startsWith("- ")) continue;
-
-                    result[i + 1] = vowel + next.slice(1);
+                if (g_restGaps && g_restGaps.length !== data.length - 1) {
+                    alert(`音符数が一致しません。入力データ: ${data.length}音, ファイル: ${g_restGaps.length + 1}音。休符補正をスキップします。`);
+                } else {
+                    for (let i = 0; i < data.length - 1; i++) {
+                        if (g_restGaps && g_restGaps[i] === true) continue;
+                        const cur = data[i];
+                        const next = data[i + 1];
+                        const curMatch = cur.match(/^[-aiueo?]\s(.+?)_/);
+                        if (!curMatch) continue;
+                        const vowel = kanaToVowel(curMatch[1]);
+                        if (!vowel) continue;
+                        if (!next.startsWith("- ")) continue;
+                        result[i + 1] = vowel + next.slice(1);
+                    }
                 }
 
-                // 出力文字列生成
                 const outputStr = result.map(s => `"${s}"`).join(" ");
                 outputEl.value = outputStr;
 
-                // クリップボードへコピー
                 navigator.clipboard.writeText(outputStr).then(() => {
-                    alert("変換結果をクリップボードにコピーしました！");
+                    // alert("変換結果をクリップボードにコピーしました！");
                 });
             } catch (e) {
                 alert("データの解析に失敗しました。形式を確認してください。");

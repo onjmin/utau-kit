@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDI歌詞パッチジェネレーター</title>
+    <title>MIDI/UST歌詞パッチジェネレーター</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://colxi.info/midi-parser-js/src/main.js"></script>
     <style>
@@ -48,21 +48,32 @@
 
     <div class="max-w-5xl mx-auto space-y-8">
         <header class="space-y-2 border-b border-gray-100 pb-4">
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900">MIDI Lyrics Pitch Matcher</h1>
-            <p class="text-gray-500 text-sm italic">MIDIの音高を解析し、録音済み音源ラベルを歌詞に自動マッピングします。</p>
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900">MIDI/UST Lyrics Pitch Matcher</h1>
+            <p class="text-gray-500 text-sm italic">MIDI/USTの音高を解析し、録音済み音源ラベルを歌詞に自動マッピングします。</p>
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div class="space-y-6">
                 <section class="p-6 rounded-xl glass-panel space-y-4 shadow-sm">
                     <div>
-                        <label class="block text-sm font-bold mb-3">1. MIDIファイルを指定</label>
-                        <input type="file" id="midiInput" accept=".mid" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-gray-400 file:text-sm file:font-semibold file:bg-white file:text-gray-700 hover:file:bg-gray-50 cursor-pointer">
+                        <label class="block text-sm font-bold mb-3">1. MIDI / USTファイルを指定</label>
+                        <input type="file" id="midiInput" accept=".mid,.ust" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-gray-400 file:text-sm file:font-semibold file:bg-white file:text-gray-700 hover:file:bg-gray-50 cursor-pointer">
                     </div>
 
                     <div id="trackSelectorArea" class="hidden space-y-2 pt-4 border-t border-gray-200">
                         <label class="block text-sm font-bold">使用するトラックを選択</label>
                         <select id="trackSelect" class="w-full p-2.5 glass-input text-sm font-medium"></select>
+                    </div>
+
+                    <div id="octaveShiftArea" class="hidden space-y-2 pt-4 border-t border-gray-200">
+                        <label class="block text-sm font-bold">オクターブシフト</label>
+                        <div class="flex gap-1" id="octaveShiftGroup">
+                            <button type="button" data-shift="-2" class="octave-btn flex-1 py-2 rounded-md text-sm font-bold border btn-action">-2</button>
+                            <button type="button" data-shift="-1" class="octave-btn flex-1 py-2 rounded-md text-sm font-bold border btn-action">-1</button>
+                            <button type="button" data-shift="0" class="octave-btn flex-1 py-2 rounded-md text-sm font-bold border btn-action selected" style="background-color:#3b82f6;color:white;border-color:#3b82f6;">0</button>
+                            <button type="button" data-shift="+1" class="octave-btn flex-1 py-2 rounded-md text-sm font-bold border btn-action">+1</button>
+                            <button type="button" data-shift="+2" class="octave-btn flex-1 py-2 rounded-md text-sm font-bold border btn-action">+2</button>
+                        </div>
                     </div>
                 </section>
 
@@ -115,6 +126,7 @@ G4
 E4
 F3`;
         let g_midiData = null;
+        let g_octaveShift = 0;
 
         const addLog = (msg, type = 'info') => {
             const container = document.getElementById('logContainer');
@@ -153,6 +165,34 @@ F3`;
             return tokens;
         };
 
+        const parseUST = (text) => {
+            const notes = [];
+            const lines = text.split('\n');
+            let current = {};
+            let inNote = false;
+
+            for (const line of lines) {
+                if (/^\[#\d+\]$/.test(line.trim())) {
+                    if (inNote && current.NoteNum !== undefined && current.Lyric !== undefined) {
+                        const n = parseInt(current.NoteNum);
+                        if (n > 0 && current.Lyric !== 'R') notes.push({ noteNum: n, lyric: current.Lyric });
+                    }
+                    current = {};
+                    inNote = true;
+                } else if (inNote) {
+                    const idx = line.indexOf('=');
+                    if (idx > 0) {
+                        current[line.substring(0, idx).trim()] = line.substring(idx + 1).trim();
+                    }
+                }
+            }
+            if (inNote && current.NoteNum !== undefined && current.Lyric !== undefined) {
+                const n = parseInt(current.NoteNum);
+                if (n > 0 && current.Lyric !== 'R') notes.push({ noteNum: n, lyric: current.Lyric });
+            }
+            return notes;
+        };
+
         const init = () => {
             const midiInput = document.getElementById('midiInput');
             const trackSelect = document.getElementById('trackSelect');
@@ -171,20 +211,76 @@ F3`;
                 document.getElementById('logContainer').innerHTML = '<div class="text-gray-400 italic">待機中...</div>';
             };
 
+            const octaveShiftGroup = document.getElementById('octaveShiftGroup');
+            const octaveShiftArea = document.getElementById('octaveShiftArea');
+            octaveShiftGroup.addEventListener('click', (e) => {
+                const btn = e.target.closest('.octave-btn');
+                if (!btn) return;
+                octaveShiftGroup.querySelectorAll('.octave-btn').forEach(b => {
+                    b.style.backgroundColor = '';
+                    b.style.color = '';
+                    b.style.borderColor = '';
+                });
+                btn.style.backgroundColor = '#3b82f6';
+                btn.style.color = 'white';
+                btn.style.borderColor = '#3b82f6';
+                g_octaveShift = parseInt(btn.dataset.shift);
+                addLog(`オクターブシフト: ${g_octaveShift > 0 ? '+' : ''}${g_octaveShift}`);
+            });
+
             // ファイル選択時に自動実行
             midiInput.addEventListener('change', (e) => {
                 const files = e.target.files;
                 if (!files || files.length === 0) return;
                 
-                addLog(`ファイルを選択しました: ${files[0].name}`);
+                const file = files[0];
+                addLog(`ファイルを選択しました: ${file.name}`);
                 g_midiData = null;
                 trackSelectorArea.classList.add('hidden');
                 trackSelect.innerHTML = '';
 
+                const isUST = file.name.toLowerCase().endsWith('.ust');
+
+                if (isUST) {
+                    addLog('USTファイルとして解析を開始します...');
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        try {
+                            const ustNotes = parseUST(ev.target.result);
+                            if (ustNotes.length === 0) {
+                                addLog('USTファイルから有効な音符が見つかりませんでした。', 'error');
+                                return;
+                            }
+                            addLog(`UST解析完了: ${ustNotes.length} 個の音符を検出`, 'success');
+
+                            g_midiData = {
+                                track: [{
+                                    event: ustNotes.map(n => ({
+                                        type: 9,
+                                        data: [n.noteNum, 100]
+                                    }))
+                                }]
+                            };
+
+                            const opt = document.createElement('option');
+                            opt.value = 0;
+                            opt.textContent = `UST Notes (${ustNotes.length} notes)`;
+                            trackSelect.appendChild(opt);
+                            trackSelectorArea.classList.remove('hidden');
+                            octaveShiftArea.classList.remove('hidden');
+                            addLog('USTデータを読み込みました。トラックが選択されています。', 'success');
+                        } catch (err) {
+                            addLog(`UST解析エラー: ${err.message}`, 'error');
+                        }
+                    };
+                    reader.onerror = () => addLog('USTファイルの読み込みに失敗しました。', 'error');
+                    reader.readAsText(file);
+                    return;
+                }
+
                 try {
                     addLog('MidiParser.parse を開始します...');
                     
-                    // ライブラリの実行。もしここでイベントが止まるなら、ファイル形式の問題かライブラリのバグ
                     window.MidiParser.parse(midiInput, (obj) => {
                         addLog('MidiParser のコールバックを受信しました。');
                         
@@ -218,6 +314,7 @@ F3`;
                                 addLog('警告: 音符（Note On）が含まれるトラックが一つもありません。', 'error');
                             } else {
                                 trackSelectorArea.classList.remove('hidden');
+                                octaveShiftArea.classList.remove('hidden');
                                 addLog('UIの更新を完了しました。トラックを選択してください。', 'success');
                             }
                         } catch (innerError) {
@@ -225,7 +322,6 @@ F3`;
                         }
                     });
                     
-                    // 非同期のため、ここですぐに終わるわけではないが、呼び出し自体は成功したことを記録
                     addLog('MidiParser へのリクエストを送信しました（非同期処理待ち）...');
 
                 } catch (err) {
@@ -260,6 +356,7 @@ F3`;
                     return;
                 }
                 addLog(`音源スケールのロード完了: ${availableScales.length} 種類`);
+                if (g_octaveShift !== 0) addLog(`オクターブシフト適用: ${g_octaveShift > 0 ? '+' : ''}${g_octaveShift} オクターブ`);
 
                 try {
                     const targetTrack = g_midiData.track[trackIdx];
@@ -268,9 +365,10 @@ F3`;
 
                     if (notes.length === 0) throw new Error('トラックに音符がありません。');
 
+                    const shift = g_octaveShift * 12;
                     const result = lyrics.map((char, i) => {
                         if (i >= notes.length) return null;
-                        const midiPitch = notes[i].data[0];
+                        const midiPitch = notes[i].data[0] + shift;
                         let closest = availableScales[0];
                         let minDiff = Math.abs(midiPitch - closest.note);
                         for (const scale of availableScales) {
