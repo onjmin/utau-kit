@@ -34,35 +34,35 @@
       <div class="lg:col-span-1 space-y-4">
         <textarea id="lyric-input" class="w-full h-[200px] bg-gray-100/10 border border-gray-800 rounded p-4 text-sm" placeholder="[0:00.00]歌詞を入力">
 # 【サビ】（前半 0～10秒）
-究極の
-音源を
-作りたい
+K[00:00.60]究極の
+G[00:00.80]音源を
+N[00:01.40]作りたい
 
-世間に
-束音を
-流行らせたい
+X[00:02.40]世間に
+T[00:02.80]束音を
+Y[00:04.20]広めたい
 
-この
-スレの
-孤独な
-エンジニアリング
+O[00:05.20]この
+Y[00:05.60]スレの
+M[00:06.20]孤独な
+N[00:06.80]エンジニアリング
 
-手伝って
-くれよ
-無産が
-さぁ！
+M[00:08.00]手伝って
+J[00:08.80]くれよ
+W[00:09.40]無産が
+F[00:10.00]さぁ！
 
 # 【サビ】（後半 10～20秒）
-でも
-なんだかんだ
-難しい
+Y[00:10.60]でも
+I[00:11.00]なんだかんだ
+O[00:12.00]難しい
 
-原音の
-設定は
-難しいんだ
+F[00:13.20]原音の
+C[00:13.60]設定は
+P[00:14.80]難しいんだ
 
-ねえ　お前らも何かして頂戴！
-えっ？　無理ですか　そーですか</textarea>
+W[00:16.00]ねえ　お前らも何かして頂戴！
+N[00:18.80]えっ？　無理ですか　そーですか</textarea>
         
         <div class="space-y-3 p-4 bg-gray-100/10 rounded border border-gray-800 text-sm">
           <div class="grid grid-cols-2 gap-2">
@@ -200,7 +200,7 @@
       
       let targetIdx = lyrics.findIndex((l, i) => time >= l.time && (!lyrics[i+1] || time < lyrics[i+1].time));
       if (targetIdx === -1) targetIdx = 0;
-      const targetY = targetIdx * (canvas.height / rows);
+      const targetY = Math.max(0, targetIdx - 1) * (canvas.height / rows);
       currentScrollY += (targetY - currentScrollY) * (1 - ease) * 0.2;
 
       ctx.fillStyle = textColor;
@@ -380,7 +380,7 @@
             const mediaEl = fileType === 'video' ? document.getElementById('video-player') : document.getElementById('audio-player');
             t = mediaEl ? mediaEl.currentTime : 0;
           }
-          draw(t);
+          draw(Math.max(0, t - seekSeconds));
           animId = requestAnimationFrame(syncLoop);
         };
         syncLoop();

@@ -366,8 +366,10 @@
         return;
       }
 
-      // 現在の再生時刻を取得
-      const currentTime = audioPlayer.currentTime;
+      // 現在の再生時刻を取得（YouTube 時は player から）
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(youtubeUrl);
+      const rawTime = isYouTube && playerRef ? (playerRef.getCurrentTime() || 0) : audioPlayer.currentTime;
+      const currentTime = Math.max(0, rawTime - seekSeconds);
       const formatted = formatTime(currentTime);
 
       // 対象の行にタグを書き込む
