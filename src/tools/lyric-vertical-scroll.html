@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lyric PV Maker - Pro Motion Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=DotGothic16&family=Hachi+Maru+Pop&family=Kaisei+Decol&family=Noto+Sans+JP&family=Potta+One&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans JP', sans-serif; background-color: #0b0f19; color: white; }
+    canvas { display: block; }
+    #font-select { background-color: white !important; color: black !important; }
+    #font-select option { background-color: white; color: black; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="app" class="p-4 max-w-[1600px] mx-auto space-y-4">
+    <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-800 pb-4 gap-4">
+      <h1 class="text-2xl font-bold flex items-center gap-2">
+        <i data-lucide="video" class="text-blue-500"></i> Lyric PV Maker 
+        <span class="text-xs bg-blue-600/30 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">Pro Motion Engine</span>
+      </h1>
+      <div class="flex gap-2">
+        <button onclick="setBgMode('blue')" class="bg-gray-100/10 hover:bg-gray-100/20 px-3 py-1 rounded text-xs">BB(青)</button>
+        <button onclick="setBgMode('green')" class="bg-gray-100/10 hover:bg-gray-100/20 px-3 py-1 rounded text-xs">GB(緑)</button>
+        <button onclick="setBgMode('black')" class="bg-gray-100/10 hover:bg-gray-100/20 px-3 py-1 rounded text-xs">黒</button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div class="lg:col-span-1 space-y-4">
+        <textarea id="lyric-input" class="w-full h-[200px] bg-gray-100/10 border border-gray-800 rounded p-4 text-sm" placeholder="[0:00.00]歌詞を入力">#【サビ】（前半：00:00 - 00:10）
+[00:00.00]金星のダンスを
+[00:01.50]踊りたい
+
+[00:04.00]金星のダンスを
+[00:05.50]踊りたい
+
+[00:07.50]この
+[00:08.30]ぼくの
+[00:09.10]ゆるやかな
+[00:09.80]スーサイド</textarea>
+        
+        <div class="space-y-3 p-4 bg-gray-100/10 rounded border border-gray-800 text-sm">
+          <input type="text" id="yt-url" value="https://www.youtube.com/watch?v=M5GSji71eUY" class="w-full bg-gray-100/10 p-2 rounded border border-gray-800">
+          
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="text-xs text-gray-500">表示行数</label><input type="number" id="display-rows" value="2" class="w-full bg-gray-100/10 p-1 rounded"></div>
+            <div><label class="text-xs text-gray-500">イージング</label><input type="number" id="ease-strength" value="0.5" step="0.1" class="w-full bg-gray-100/10 p-1 rounded"></div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="text-xs text-gray-500">文字色</label><input type="color" id="text-color" value="#ffffff" class="w-full h-8 cursor-pointer"></div>
+            <div><label class="text-xs text-gray-500">縁取色</label><input type="color" id="stroke-color" value="#000000" class="w-full h-8 cursor-pointer"></div>
+          </div>
+          
+          <div class="flex gap-4 items-center">
+            <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="font-bold"> 太字</label>
+            <div class="flex-1"><label class="text-xs text-gray-500 block">縁取幅</label><input type="range" id="stroke-width" min="0" max="20" value="4" class="w-full"></div>
+          </div>
+          
+          <select id="font-select" onchange="draw(currentTime)" class="w-full p-2 rounded border border-gray-800 cursor-pointer">
+            <option value="'Noto Sans JP', sans-serif">Noto Sans JP</option>
+            <option value="'Dela Gothic One', cursive">Dela Gothic One</option>
+          </select>
+          
+          <button onclick="processLyrics()" class="w-full bg-gray-100/10 hover:bg-gray-100/20 py-2 rounded font-bold">設定を適用・更新</button>
+          
+          <div class="flex gap-2">
+            <button id="play-btn" onclick="togglePlay()" class="flex-1 bg-gray-100/10 hover:bg-gray-100/20 py-2 rounded font-bold">再生</button>
+            <button onclick="initPlayer()" class="flex-1 bg-gray-100/10 hover:bg-gray-100/20 py-2 rounded font-bold">同期再生</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="lg:col-span-3 space-y-4">
+        <div class="relative cursor-pointer" id="progress-container">
+            <canvas id="preview-canvas" class="w-full rounded border border-gray-800"></canvas>
+            <div class="absolute bottom-0 left-0 w-full h-3 bg-gray-900 border-t border-gray-700">
+                <div id="progress-bar" class="h-full bg-blue-600 w-0"></div>
+            </div>
+        </div>
+        <div id="yt-player" class="w-full h-64 bg-black rounded border border-gray-800"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const canvas = document.getElementById('preview-canvas');
+    const ctx = canvas.getContext('2d');
+    const progressBar = document.getElementById('progress-bar');
+    const progressContainer = document.getElementById('progress-container');
+    let lyrics = [], bgMode = '#0000FF', currentTime = 0, animId = null, isPlaying = false, player = null, currentScrollY = 0, totalDuration = 0, lastTime = 0;
+
+    function setBgMode(m) { bgMode = m === 'blue' ? '#0000FF' : m === 'green' ? '#00FF00' : '#000'; draw(currentTime); }
+
+    function processLyrics() {
+      const input = document.getElementById('lyric-input').value;
+      lyrics = input.split('\n')
+        .filter(l => l.trim() && !l.trim().startsWith('#'))
+        .map(l => {
+          const text = l.split(']')[1] || l;
+          const match = l.match(/\[(\d+):(\d+\.\d+)\]/);
+          const time = match ? parseInt(match[1])*60 + parseFloat(match[2]) : 0;
+          ctx.font = '80px ' + document.getElementById('font-select').value;
+          const m = ctx.measureText(text.trim());
+          return { time, text: text.trim(), scale: Math.min(1, (canvas.width * 0.64) / (m.width || 400)) };
+        }).sort((a, b) => a.time - b.time);
+      totalDuration = lyrics.length > 0 ? lyrics[lyrics.length - 1].time + 5 : 60;
+      draw(0);
+    }
+
+    function draw(time) {
+      currentTime = time;
+      ctx.fillStyle = bgMode; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const rows = parseInt(document.getElementById('display-rows').value) || 2;
+      const ease = parseFloat(document.getElementById('ease-strength').value) || 0.5;
+      const textColor = document.getElementById('text-color').value;
+      const strokeColor = document.getElementById('stroke-color').value;
+      const isBold = document.getElementById('font-bold').checked;
+      const strokeWidth = document.getElementById('stroke-width').value;
+      
+      progressBar.style.width = Math.min(100, (time / totalDuration) * 100) + '%';
+      
+      let targetIdx = lyrics.findIndex((l, i) => time >= l.time && (!lyrics[i+1] || time < lyrics[i+1].time));
+      if (targetIdx === -1) targetIdx = 0;
+      const targetY = targetIdx * (canvas.height / rows);
+      currentScrollY += (targetY - currentScrollY) * (1 - ease) * 0.2;
+
+      ctx.fillStyle = textColor;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = (isBold ? 'bold ' : '') + (canvas.height / (rows * 2)) + 'px ' + document.getElementById('font-select').value;
+      
+      lyrics.forEach((l, i) => {
+        const y = (i * (canvas.height / rows)) - currentScrollY + (canvas.height / 2.5);
+        ctx.save();
+        ctx.scale(l.scale, 1);
+        if (strokeWidth > 0) ctx.strokeText(l.text, (canvas.width / 2) / l.scale, y);
+        ctx.fillText(l.text, (canvas.width / 2) / l.scale, y);
+        ctx.restore();
+      });
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById('play-btn').innerText = isPlaying ? '停止' : '再生';
+      if (isPlaying) {
+        lastTime = Date.now();
+        const tick = () => {
+          if (!isPlaying) return;
+          const now = Date.now();
+          currentTime += (now - lastTime) / 1000;
+          lastTime = now;
+          draw(currentTime);
+          animId = requestAnimationFrame(tick);
+        };
+        tick();
+      } else cancelAnimationFrame(animId);
+    }
+
+    progressContainer.onclick = (e) => {
+      const rect = progressContainer.getBoundingClientRect();
+      const pos = (e.clientX - rect.left) / rect.width;
+      currentTime = pos * totalDuration;
+      draw(currentTime);
+      if (player) player.seekTo(currentTime);
+    };
+
+    function initPlayer() {
+      const id = document.getElementById('yt-url').value.match(/v=([^&]+)/)?.[1];
+      if (!id) return;
+      player = new YT.Player('yt-player', { videoId: id, events: { onReady: (e) => { 
+        const loop = () => { draw(e.target.getCurrentTime()); animId = requestAnimationFrame(loop); };
+        loop(); 
+      }}});
+    }
+
+    window.onload = () => { canvas.width = 1280; canvas.height = 720; processLyrics(); lucide.createIcons(); };
+  </script>
+</body>
+</html>
