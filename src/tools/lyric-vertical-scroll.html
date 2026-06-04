@@ -14,6 +14,10 @@
     canvas { display: block; }
     #font-select { background-color: white !important; color: black !important; }
     #font-select option { background-color: white; color: black; }
+    @font-face {
+      font-family: '美咲ゴシック';
+      src: url('https://cdn.leafscape.be/misaki/misaki_gothic_web.woff2') format("woff2");
+    }
   </style>
 </head>
 <body class="min-h-screen">
@@ -42,7 +46,7 @@ X[00:02.40]世間に
 T[00:02.80]束音を
 Y[00:04.20]広めたい
 
-O[00:05.20]この
+O[00:05.20]こ　の
 Y[00:05.60]スレの
 M[00:06.20]孤独な
 N[00:06.80]エンジニアリング
@@ -53,7 +57,7 @@ W[00:09.40]無産が
 F[00:10.00]さぁ！
 
 # 【サビ】（後半 10～20秒）
-Y[00:10.60]でも
+Y[00:10.60]で　も
 I[00:11.00]なんだかんだ
 O[00:12.00]難しい
 
@@ -71,18 +75,25 @@ N[00:18.80]えっ？　無理ですか　そーですか</textarea>
           </div>
           
           <div class="grid grid-cols-2 gap-2">
-            <div><label class="text-xs text-gray-500">文字色</label><input type="color" id="text-color" value="#ffffff" class="w-full h-8 cursor-pointer"></div>
+            <div><label class="text-xs text-gray-500">文字色</label><input type="color" id="text-color" value="#000000" class="w-full h-8 cursor-pointer"></div>
             <div><label class="text-xs text-gray-500">縁取色</label><input type="color" id="stroke-color" value="#000000" class="w-full h-8 cursor-pointer"></div>
           </div>
           
           <div class="flex gap-4 items-center">
-            <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="font-bold"> 太字</label>
+            <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="font-bold" checked> 太字</label>
             <div class="flex-1"><label class="text-xs text-gray-500 block">縁取幅</label><input type="range" id="stroke-width" min="0" max="20" value="4" class="w-full"></div>
           </div>
           
           <select id="font-select" onchange="draw(currentTime)" class="w-full p-2 rounded border border-gray-800 cursor-pointer">
+            <option value='"Hiragino Sans", "Yu Gothic", "MS PGothic", sans-serif'>ゴシック</option>
+            <option value='"Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif'>明朝</option>
+            <option value='"美咲ゴシック", monospace'>美咲ゴシック</option>
             <option value="'Noto Sans JP', sans-serif">Noto Sans JP</option>
+            <option value="'Kaisei Decol', serif">Kaisei Decol</option>
+            <option value="'DotGothic16', sans-serif">DotGothic16</option>
             <option value="'Dela Gothic One', cursive">Dela Gothic One</option>
+            <option value="'Potta One', cursive">Potta One</option>
+            <option value="'Hachi Maru Pop', cursive">Hachi Maru Pop</option>
           </select>
           
           <button onclick="processLyrics()" class="w-full bg-gray-100/10 hover:bg-gray-100/20 py-2 rounded font-bold">設定を適用・更新</button>
@@ -146,7 +157,7 @@ N[00:18.80]えっ？　無理ですか　そーですか</textarea>
     const ctx = canvas.getContext('2d');
     const progressBar = document.getElementById('progress-bar');
     const progressContainer = document.getElementById('progress-container');
-    let lyrics = [], bgMode = '#0000FF', currentTime = 0, animId = null, isPlaying = false, currentScrollY = 0, totalDuration = 0, lastTime = 0;
+    let lyrics = [], bgMode = '#00FF00', currentTime = 0, animId = null, isPlaying = false, currentScrollY = 0, totalDuration = 0, lastTime = 0;
     let youtubeApiReady = false, youtubePlayer = null, youtubePlayerReady = false, creatingYouTube = false;
     let playbackMode = 'url', youtubeUrl = 'https://www.youtube.com/watch?v=M5GSji71eUY', selectedFile = null, fileUrl = '', fileType = 'audio', syncedDelay = 0, seekSeconds = 45;
 
@@ -172,13 +183,16 @@ N[00:18.80]えっ？　無理ですか　そーですか</textarea>
 
     function processLyrics() {
       const input = document.getElementById('lyric-input').value;
+      const rows = parseInt(document.getElementById('display-rows').value) || 2;
+      const font = document.getElementById('font-select').value;
+      const drawFontSize = canvas.height / (rows * 2);
+      ctx.font = drawFontSize + 'px ' + font;
       lyrics = input.split('\n')
         .filter(l => l.trim() && !l.trim().startsWith('#'))
         .map(l => {
           const text = l.split(']')[1] || l;
           const match = l.match(/\[(\d+):(\d+\.\d+)\]/);
           const time = match ? parseInt(match[1])*60 + parseFloat(match[2]) : 0;
-          ctx.font = '80px ' + document.getElementById('font-select').value;
           const m = ctx.measureText(text.trim());
           return { time, text: text.trim(), scale: Math.min(1, (canvas.width * 0.64) / (m.width || 400)) };
         }).sort((a, b) => a.time - b.time);
