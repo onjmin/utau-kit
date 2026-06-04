@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LRC 歌詞タイミングエディター</title>
+  <title>字幕タイミング設定ツール</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -35,7 +35,7 @@
         <i data-lucide="music-4" class="w-6 h-6 text-cyan-400"></i>
       </div>
       <div>
-        <h1 class="text-xl font-bold tracking-wider">LRC Lyrics Tagger</h1>
+        <h1 class="text-xl font-bold tracking-wider">字幕タイミング設定ツール</h1>
         <p class="text-xs text-gray-500">スペースキーまたはクリックで直感的に歌詞のタイムタグを記録</p>
       </div>
     </div>
@@ -53,28 +53,49 @@
     <!-- 左ペイン: 入力・設定 (5カラム) -->
     <div class="lg:col-span-5 flex flex-col space-y-4">
       
-      <!-- MP3 音源セクション -->
+      <!-- 同期再生設定 -->
       <div class="bg-gray-100/10 p-5 rounded-xl border border-gray-700/50 backdrop-blur-sm">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold tracking-wide uppercase text-gray-500 flex items-center gap-2">
-            <i data-lucide="volume-2" class="w-4 h-4"></i> 音声ソース
+            <i data-lucide="volume-2" class="w-4 h-4"></i> 同期再生設定
           </h2>
           <span id="audio-status" class="text-xs bg-gray-100/10 px-2.5 py-0.5 rounded-full border border-gray-700/50">デフォルト音源ロード済</span>
         </div>
-        
-        <!-- オーディオ要素 -->
-        <audio id="audio-player" class="w-full mb-3 focus:outline-none" controls src="https://res.cloudinary.com/dbld5kqtz/video/upload/v1779899642/test_qowds1.mp3"></audio>
-        
-        <!-- カスタムファイルアップロード -->
-        <div class="mt-2">
-          <label class="block text-xs text-gray-500 mb-2">手持ちのMP3を使用する場合はこちらからロード:</label>
-          <div class="relative flex items-center justify-center border border-dashed border-gray-700 rounded-lg p-3 hover:border-cyan-500/50 hover:bg-gray-100/20 transition-all cursor-pointer">
-            <input type="file" id="file-uploader" accept="audio/mp3,audio/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-            <div class="flex items-center space-x-2 text-xs">
-              <i data-lucide="upload" class="w-4 h-4"></i>
-              <span id="file-name">音声ファイルを選択 (.mp3 など)</span>
+
+        <div class="space-y-3">
+          <div class="flex flex-wrap gap-4 items-end">
+            <label class="flex items-center gap-2 text-sm text-gray-200">
+              <input type="radio" name="playbackMode" value="url" onchange="onPlaybackModeChange('url')"> URLから再生
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-200">
+              <input type="radio" name="playbackMode" value="file" checked onchange="onPlaybackModeChange('file')"> 動画/音楽ファイル
+            </label>
+            <div class="flex-1 min-w-[280px]">
+              <label class="block text-xs font-bold mb-1 text-gray-500">コンテンツ</label>
+              <input type="text" id="media-url-input" value="" class="w-full bg-gray-100/10 p-2 rounded border border-gray-800" style="display:none" oninput="onMediaUrlChange(this.value)">
+              <input type="file" id="media-file-input" accept="audio/*,video/*" class="w-full rounded bg-gray-100/10 text-sm text-gray-200" onchange="onFileChange(this)">
             </div>
           </div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <button id="sync-play-btn" onclick="handleSyncPlay()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold">同期再生</button>
+            <div class="flex items-center gap-1">
+              <label class="text-xs text-gray-400 whitespace-nowrap">シーク</label>
+              <input type="number" id="seek-seconds" min="0" step="1" value="0" class="w-16 p-1 border border-gray-800 bg-gray-100/10 rounded text-white text-sm" oninput="onSeekChange(this.value)">
+              <span class="text-xs text-gray-400">秒</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <label class="text-xs text-gray-400 whitespace-nowrap">遅延開始</label>
+              <input type="number" id="synced-delay" min="0" step="0.1" value="0" class="w-16 p-1 border border-gray-800 bg-gray-100/10 rounded text-white text-sm" oninput="onDelayChange(this.value)">
+              <span class="text-xs text-gray-400">秒</span>
+            </div>
+            <span class="text-sm text-gray-400">コンテンツを<span id="seek-label">0</span>秒から再生し、<span id="delay-label">0.00</span>秒後に同期を開始します。</span>
+          </div>
+        </div>
+
+        <div id="media-player-area" class="mt-3 max-w-sm rounded border border-gray-800 bg-black">
+          <div id="youtube-container" class="w-full aspect-video bg-black" style="display:none"></div>
+          <audio id="audio-player" class="w-full" controls src="https://res.cloudinary.com/dbld5kqtz/video/upload/v1779899642/test_qowds1.mp3"></audio>
+          <div id="media-placeholder" class="text-sm text-gray-400 p-4 text-center" style="display:none">URLまたはファイルを指定するとプレビューが表示されます。</div>
         </div>
       </div>
 
@@ -209,8 +230,6 @@
 
     // DOM要素の取得
     const audioPlayer = document.getElementById('audio-player');
-    const fileUploader = document.getElementById('file-uploader');
-    const fileNameText = document.getElementById('file-name');
     const lyricsInput = document.getElementById('lyrics-input');
     const resetLyricsBtn = document.getElementById('reset-lyrics-btn');
     
@@ -225,6 +244,21 @@
     const copyBtn = document.getElementById('copy-btn');
     const copyToast = document.getElementById('copy-toast');
     const audioStatus = document.getElementById('audio-status');
+
+    // 同期再生設定の状態
+    let playbackMode = 'file', youtubeUrl = '', selectedFile = null, fileUrl = 'https://res.cloudinary.com/dbld5kqtz/video/upload/v1779899642/test_qowds1.mp3', fileType = 'audio', syncedDelay = 0, seekSeconds = 0;
+    let youtubeApiReady = false, playerRef = null, youtubePlayerReady = false, creatingYouTube = false;
+    const mediaPlaceholder = document.getElementById('media-placeholder');
+
+    // YouTube IFrame API の動的ロード
+    if (typeof YT !== 'undefined' && YT.Player) {
+      youtubeApiReady = true;
+    } else if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      window.onYouTubeIframeAPIReady = () => { youtubeApiReady = true; };
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.body.appendChild(tag);
+    }
 
     // 初期化処理
     window.addEventListener('DOMContentLoaded', () => {
@@ -243,18 +277,6 @@
         if(confirm('歌詞をデフォルトにリセットしますか？')){
           lyricsInput.value = DEFAULT_LYRICS;
           parseLyrics();
-        }
-      });
-
-      // ファイルアップロードの検知
-      fileUploader.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          fileNameText.textContent = file.name;
-          const objectUrl = URL.createObjectURL(file);
-          audioPlayer.src = objectUrl;
-          audioStatus.textContent = "カスタム音源ロード済";
-          audioStatus.className = "text-xs bg-emerald-950/30 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20";
         }
       });
 
@@ -486,6 +508,125 @@
       } finally {
         document.body.removeChild(tempTextArea);
       }
+    }
+    // 同期再生設定の関数
+    function parseYouTubeId(url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.hostname.includes('youtu.be')) return parsed.pathname.slice(1);
+        if (parsed.hostname.includes('youtube.com')) return parsed.searchParams.get('v');
+        return null;
+      } catch { return null; }
+    }
+
+    function showMediaPlayer(isYouTube) {
+      document.getElementById('youtube-container').style.display = isYouTube ? '' : 'none';
+      audioPlayer.style.display = isYouTube ? 'none' : (fileUrl ? '' : 'none');
+      mediaPlaceholder.style.display = (!isYouTube && !fileUrl) ? '' : 'none';
+    }
+
+    function onPlaybackModeChange(mode) {
+      playbackMode = mode;
+      document.getElementById('media-url-input').style.display = mode === 'url' ? '' : 'none';
+      document.getElementById('media-file-input').style.display = mode === 'file' ? '' : 'none';
+      if (mode === 'file' && playerRef) {
+        try { playerRef.destroy(); } catch(e) {} playerRef = null; youtubePlayerReady = false; creatingYouTube = false;
+      }
+      updateMediaDisplay();
+    }
+
+    function onMediaUrlChange(value) {
+      youtubeUrl = value;
+      if (playerRef) { try { playerRef.destroy(); } catch(e) {} playerRef = null; youtubePlayerReady = false; }
+      creatingYouTube = false;
+      document.getElementById('youtube-container').innerHTML = '';
+      updateMediaDisplay();
+    }
+
+    function onFileChange(input) {
+      const file = input.files?.[0] || null;
+      selectedFile = file;
+      if (file) {
+        if (fileUrl && fileUrl.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
+        fileUrl = URL.createObjectURL(file);
+        fileType = file.type.startsWith('video/') ? 'video' : 'audio';
+        audioPlayer.src = fileUrl; audioPlayer.load();
+        audioStatus.textContent = "カスタム音源ロード済";
+        audioStatus.className = "text-xs bg-emerald-950/30 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20";
+      }
+      updateMediaDisplay();
+    }
+
+    function onSeekChange(value) {
+      seekSeconds = parseFloat(value) || 0;
+      document.getElementById('seek-label').textContent = seekSeconds;
+    }
+
+    function onDelayChange(value) {
+      syncedDelay = parseFloat(value) || 0;
+      document.getElementById('delay-label').textContent = syncedDelay.toFixed(2);
+    }
+
+    function updateMediaDisplay() {
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(youtubeUrl);
+      if (isYouTube) {
+        showMediaPlayer(true);
+        if (youtubeApiReady) ensureYouTubePlayer();
+      } else if (fileUrl) {
+        showMediaPlayer(false);
+      } else {
+        showMediaPlayer(false);
+      }
+    }
+
+    function ensureYouTubePlayer() {
+      return new Promise((resolve) => {
+        const videoId = parseYouTubeId(youtubeUrl);
+        if (!videoId) { resolve(false); return; }
+        if (playerRef && youtubePlayerReady) { resolve(true); return; }
+        if (creatingYouTube) {
+          const check = () => {
+            if (creatingYouTube) { setTimeout(check, 100); return; }
+            resolve(!!(playerRef && youtubePlayerReady));
+          };
+          check(); return;
+        }
+        if (playerRef) { try { playerRef.destroy(); } catch(e) {} playerRef = null; }
+        document.getElementById('youtube-container').innerHTML = '';
+        creatingYouTube = true;
+        const tryCreate = () => {
+          if (!youtubeApiReady || typeof YT === 'undefined') { setTimeout(tryCreate, 100); return; }
+          playerRef = new YT.Player('youtube-container', {
+            width: '100%', height: '100%', videoId,
+            playerVars: { rel: 0, modestbranding: 1, controls: 1, disablekb: 1 },
+            events: {
+              onReady: () => { youtubePlayerReady = true; creatingYouTube = false; resolve(true); },
+              onStateChange: () => {},
+            },
+          });
+        };
+        if (youtubeApiReady && typeof YT !== 'undefined') { tryCreate(); }
+        else {
+          const wait = () => {
+            if (youtubeApiReady && typeof YT !== 'undefined') { tryCreate(); }
+            else { setTimeout(wait, 100); }
+          };
+          wait();
+        }
+      });
+    }
+
+    function handleSyncPlay() {
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(youtubeUrl);
+      if (isYouTube) {
+        if (!playerRef || !youtubePlayerReady) return;
+        playerRef.seekTo(seekSeconds, true);
+        playerRef.playVideo();
+        return;
+      }
+      if (!audioPlayer) return;
+      audioPlayer.currentTime = seekSeconds;
+      audioPlayer.play();
     }
   </script>
 </body>

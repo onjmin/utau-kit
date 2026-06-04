@@ -32,21 +32,39 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
       <div class="lg:col-span-1 space-y-4">
-        <textarea id="lyric-input" class="w-full h-[200px] bg-gray-100/10 border border-gray-800 rounded p-4 text-sm" placeholder="[0:00.00]歌詞を入力">#【サビ】（前半：00:00 - 00:10）
-[00:00.00]金星のダンスを
-[00:01.50]踊りたい
+        <textarea id="lyric-input" class="w-full h-[200px] bg-gray-100/10 border border-gray-800 rounded p-4 text-sm" placeholder="[0:00.00]歌詞を入力">
+# 【サビ】（前半 0～10秒）
+究極の
+音源を
+作りたい
 
-[00:04.00]金星のダンスを
-[00:05.50]踊りたい
+世間に
+束音を
+流行らせたい
 
-[00:07.50]この
-[00:08.30]ぼくの
-[00:09.10]ゆるやかな
-[00:09.80]スーサイド</textarea>
+この
+スレの
+孤独な
+エンジニアリング
+
+手伝って
+くれよ
+無産が
+さぁ！
+
+# 【サビ】（後半 10～20秒）
+でも
+なんだかんだ
+難しい
+
+原音の
+設定は
+難しいんだ
+
+ねえ　お前らも何かして頂戴！
+えっ？　無理ですか　そーですか</textarea>
         
         <div class="space-y-3 p-4 bg-gray-100/10 rounded border border-gray-800 text-sm">
-          <input type="text" id="yt-url" value="https://www.youtube.com/watch?v=M5GSji71eUY" class="w-full bg-gray-100/10 p-2 rounded border border-gray-800">
-          
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500">表示行数</label><input type="number" id="display-rows" value="2" class="w-full bg-gray-100/10 p-1 rounded"></div>
             <div><label class="text-xs text-gray-500">イージング</label><input type="number" id="ease-strength" value="0.5" step="0.1" class="w-full bg-gray-100/10 p-1 rounded"></div>
@@ -71,7 +89,37 @@
           
           <div class="flex gap-2">
             <button id="play-btn" onclick="togglePlay()" class="flex-1 bg-gray-100/10 hover:bg-gray-100/20 py-2 rounded font-bold">再生</button>
-            <button onclick="initPlayer()" class="flex-1 bg-gray-100/10 hover:bg-gray-100/20 py-2 rounded font-bold">同期再生</button>
+          </div>
+        </div>
+
+        <div class="space-y-3 p-4 bg-gray-100/10 rounded border border-gray-800 text-sm">
+          <div class="font-bold text-gray-200">同期再生設定</div>
+          <div class="flex flex-wrap gap-4 items-end">
+            <label class="flex items-center gap-2 text-sm text-gray-200">
+              <input type="radio" name="playbackMode" value="url" checked onchange="onPlaybackModeChange('url')"> URLから再生
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-200">
+              <input type="radio" name="playbackMode" value="file" onchange="onPlaybackModeChange('file')"> 動画/音楽ファイル
+            </label>
+            <div class="flex-1 min-w-[280px]">
+              <label class="block text-xs font-bold mb-1 text-gray-500">コンテンツ</label>
+              <input type="text" id="media-url-input" value="https://www.youtube.com/watch?v=M5GSji71eUY" class="w-full bg-gray-100/10 p-2 rounded border border-gray-800" oninput="onMediaUrlChange(this.value)">
+              <input type="file" id="media-file-input" accept="audio/*,video/*" class="w-full rounded bg-gray-100/10 text-sm text-gray-200" style="display:none" onchange="onFileChange(this)">
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <button id="sync-play-btn" onclick="handleSyncPlay()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold">同期再生</button>
+            <div class="flex items-center gap-1">
+              <label class="text-xs text-gray-400 whitespace-nowrap">シーク</label>
+              <input type="number" id="seek-seconds" min="0" step="1" value="45" class="w-16 p-1 border border-gray-800 bg-gray-100/10 rounded text-white text-sm" oninput="onSeekChange(this.value)">
+              <span class="text-xs text-gray-400">秒</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <label class="text-xs text-gray-400 whitespace-nowrap">遅延開始</label>
+              <input type="number" id="synced-delay" min="0" step="0.1" value="0" class="w-16 p-1 border border-gray-800 bg-gray-100/10 rounded text-white text-sm" oninput="onDelayChange(this.value)">
+              <span class="text-xs text-gray-400">秒</span>
+            </div>
+            <span class="text-sm text-gray-400">コンテンツを<span id="seek-label">45</span>秒から再生し、<span id="delay-label">0.00</span>秒後に同期を開始します。</span>
           </div>
         </div>
       </div>
@@ -83,18 +131,42 @@
                 <div id="progress-bar" class="h-full bg-blue-600 w-0"></div>
             </div>
         </div>
-        <div id="yt-player" class="w-full h-64 bg-black rounded border border-gray-800"></div>
+        <div id="media-player-area" class="max-w-sm mx-auto rounded border border-gray-800 bg-black">
+          <div id="youtube-container" class="w-full aspect-video bg-black"></div>
+          <video id="video-player" class="w-full bg-black" controls style="display:none"></video>
+          <audio id="audio-player" class="w-full" controls style="display:none"></audio>
+          <div id="media-placeholder" class="text-sm text-gray-400 p-4 text-center">URLまたはファイルを指定するとプレビューが表示されます。</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
   <script>
     const canvas = document.getElementById('preview-canvas');
     const ctx = canvas.getContext('2d');
     const progressBar = document.getElementById('progress-bar');
     const progressContainer = document.getElementById('progress-container');
-    let lyrics = [], bgMode = '#0000FF', currentTime = 0, animId = null, isPlaying = false, player = null, currentScrollY = 0, totalDuration = 0, lastTime = 0;
+    let lyrics = [], bgMode = '#0000FF', currentTime = 0, animId = null, isPlaying = false, currentScrollY = 0, totalDuration = 0, lastTime = 0;
+    let youtubeApiReady = false, youtubePlayer = null, youtubePlayerReady = false, creatingYouTube = false;
+    let playbackMode = 'url', youtubeUrl = 'https://www.youtube.com/watch?v=M5GSji71eUY', selectedFile = null, fileUrl = '', fileType = 'audio', syncedDelay = 0, seekSeconds = 45;
+
+    if (typeof YT !== 'undefined' && YT.Player) {
+      youtubeApiReady = true;
+    } else if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      window.onYouTubeIframeAPIReady = () => { youtubeApiReady = true; };
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.body.appendChild(tag);
+    }
+
+    function parseYouTubeId(url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.hostname.includes('youtu.be')) return parsed.pathname.slice(1);
+        if (parsed.hostname.includes('youtube.com')) return parsed.searchParams.get('v');
+        return null;
+      } catch { return null; }
+    }
 
     function setBgMode(m) { bgMode = m === 'blue' ? '#0000FF' : m === 'green' ? '#00FF00' : '#000'; draw(currentTime); }
 
@@ -124,7 +196,7 @@
       const isBold = document.getElementById('font-bold').checked;
       const strokeWidth = document.getElementById('stroke-width').value;
       
-      progressBar.style.width = Math.min(100, (time / totalDuration) * 100) + '%';
+      progressBar.style.width = Math.min(100, (time / Math.max(totalDuration, 1)) * 100) + '%';
       
       let targetIdx = lyrics.findIndex((l, i) => time >= l.time && (!lyrics[i+1] || time < lyrics[i+1].time));
       if (targetIdx === -1) targetIdx = 0;
@@ -168,21 +240,154 @@
     progressContainer.onclick = (e) => {
       const rect = progressContainer.getBoundingClientRect();
       const pos = (e.clientX - rect.left) / rect.width;
-      currentTime = pos * totalDuration;
+      currentTime = pos * Math.max(totalDuration, 1);
       draw(currentTime);
-      if (player) player.seekTo(currentTime);
+      if (youtubePlayer && youtubePlayerReady) youtubePlayer.seekTo(currentTime);
+      const mediaEl = fileType === 'video' ? document.getElementById('video-player') : document.getElementById('audio-player');
+      if (mediaEl && mediaEl.readyState > 0) mediaEl.currentTime = currentTime;
     };
 
-    function initPlayer() {
-      const id = document.getElementById('yt-url').value.match(/v=([^&]+)/)?.[1];
-      if (!id) return;
-      player = new YT.Player('yt-player', { videoId: id, events: { onReady: (e) => { 
-        const loop = () => { draw(e.target.getCurrentTime()); animId = requestAnimationFrame(loop); };
-        loop(); 
-      }}});
+    function showMediaPlayer(isYouTube) {
+      document.getElementById('youtube-container').style.display = isYouTube ? '' : 'none';
+      document.getElementById('video-player').style.display = !isYouTube && fileType === 'video' ? '' : 'none';
+      document.getElementById('audio-player').style.display = !isYouTube && fileType === 'audio' ? '' : 'none';
+      document.getElementById('media-placeholder').style.display = (!isYouTube && !fileUrl) ? '' : 'none';
     }
 
-    window.onload = () => { canvas.width = 1280; canvas.height = 720; processLyrics(); lucide.createIcons(); };
+    function onPlaybackModeChange(mode) {
+      playbackMode = mode;
+      document.getElementById('media-url-input').style.display = mode === 'url' ? '' : 'none';
+      document.getElementById('media-file-input').style.display = mode === 'file' ? '' : 'none';
+      if (mode === 'file' && youtubePlayer) {
+        try { youtubePlayer.destroy(); } catch(e) {} youtubePlayer = null; youtubePlayerReady = false; creatingYouTube = false;
+      }
+      updateMediaDisplay();
+    }
+
+    function onMediaUrlChange(value) {
+      youtubeUrl = value;
+      if (youtubePlayer) { try { youtubePlayer.destroy(); } catch(e) {} youtubePlayer = null; youtubePlayerReady = false; }
+      creatingYouTube = false;
+      document.getElementById('youtube-container').innerHTML = '';
+      updateMediaDisplay();
+    }
+
+    function onFileChange(input) {
+      const file = input.files?.[0] || null;
+      selectedFile = file;
+      if (fileUrl) URL.revokeObjectURL(fileUrl);
+      if (file) {
+        fileUrl = URL.createObjectURL(file);
+        fileType = file.type.startsWith('video/') ? 'video' : 'audio';
+        const el = fileType === 'video' ? document.getElementById('video-player') : document.getElementById('audio-player');
+        el.src = fileUrl; el.load();
+      } else { fileUrl = ''; }
+      updateMediaDisplay();
+    }
+
+    function onSeekChange(value) {
+      seekSeconds = parseFloat(value) || 0;
+      document.getElementById('seek-label').textContent = seekSeconds;
+    }
+
+    function onDelayChange(value) {
+      syncedDelay = parseFloat(value) || 0;
+      document.getElementById('delay-label').textContent = syncedDelay.toFixed(2);
+    }
+
+    function updateMediaDisplay() {
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(youtubeUrl);
+      if (isYouTube) {
+        showMediaPlayer(true);
+        if (youtubeApiReady) ensureYouTubePlayer();
+      } else if (fileUrl) {
+        showMediaPlayer(false);
+      } else {
+        showMediaPlayer(false);
+      }
+    }
+
+    function ensureYouTubePlayer() {
+      return new Promise((resolve) => {
+        const videoId = parseYouTubeId(youtubeUrl);
+        if (!videoId) { resolve(false); return; }
+        if (youtubePlayer && youtubePlayerReady) { resolve(true); return; }
+        if (creatingYouTube) {
+          const check = () => {
+            if (creatingYouTube) { setTimeout(check, 100); return; }
+            resolve(!!(youtubePlayer && youtubePlayerReady));
+          };
+          check(); return;
+        }
+        if (youtubePlayer) { try { youtubePlayer.destroy(); } catch(e) {} youtubePlayer = null; }
+        document.getElementById('youtube-container').innerHTML = '';
+        creatingYouTube = true;
+        const tryCreate = () => {
+          if (!youtubeApiReady || typeof YT === 'undefined') { setTimeout(tryCreate, 100); return; }
+          youtubePlayer = new YT.Player('youtube-container', {
+            width: '100%', height: '100%', videoId,
+            playerVars: { rel: 0, modestbranding: 1, controls: 1, disablekb: 1 },
+            events: {
+              onReady: () => { youtubePlayerReady = true; creatingYouTube = false; resolve(true); },
+              onStateChange: () => {},
+            },
+          });
+        };
+        if (youtubeApiReady && typeof YT !== 'undefined') { tryCreate(); }
+        else {
+          const wait = () => {
+            if (youtubeApiReady && typeof YT !== 'undefined') { tryCreate(); }
+            else { setTimeout(wait, 100); }
+          };
+          wait();
+        }
+      });
+    }
+
+    async function seekAndPlayMedia() {
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(youtubeUrl);
+      if (isYouTube) {
+        if (!youtubePlayerReady || !youtubePlayer) return false;
+        try { youtubePlayer.seekTo(seekSeconds, true); youtubePlayer.playVideo(); return true; }
+        catch (e) { console.error('YouTube play error', e); return false; }
+      }
+      const mediaEl = fileType === 'video' ? document.getElementById('video-player') : document.getElementById('audio-player');
+      if (!mediaEl || !fileUrl) return false;
+      try { mediaEl.currentTime = seekSeconds; await mediaEl.play(); return true; }
+      catch (e) { console.error('Media play error', e); return false; }
+    }
+
+    async function handleSyncPlay() {
+      if (animId) cancelAnimationFrame(animId);
+      isPlaying = false;
+      document.getElementById('play-btn').innerText = '再生';
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(youtubeUrl);
+      let ready = false;
+      if (isYouTube) ready = await ensureYouTubePlayer();
+      else ready = !!fileUrl;
+      if (!ready) return;
+      const started = await seekAndPlayMedia();
+      if (!started) return;
+      setTimeout(() => {
+        isPlaying = true;
+        document.getElementById('play-btn').innerText = '停止';
+        const syncLoop = () => {
+          if (!isPlaying) return;
+          let t;
+          if (isYouTube && youtubePlayer && youtubePlayerReady) {
+            try { t = youtubePlayer.getCurrentTime(); } catch(e) { t = 0; }
+          } else {
+            const mediaEl = fileType === 'video' ? document.getElementById('video-player') : document.getElementById('audio-player');
+            t = mediaEl ? mediaEl.currentTime : 0;
+          }
+          draw(t);
+          animId = requestAnimationFrame(syncLoop);
+        };
+        syncLoop();
+      }, Math.round(syncedDelay * 1000));
+    }
+
+    window.onload = () => { canvas.width = 1280; canvas.height = 720; processLyrics(); lucide.createIcons(); updateMediaDisplay(); };
   </script>
 </body>
 </html>

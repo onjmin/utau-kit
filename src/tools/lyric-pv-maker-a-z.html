@@ -111,19 +111,47 @@
           </div>
         </div>
 
-        <!-- 音声ファイル同期 -->
+        <!-- 同期再生設定 -->
         <div class="bg-gray-100/10 rounded-md border border-gray-800 p-4 flex flex-col gap-3">
           <span class="text-sm font-bold flex items-center gap-2 text-white">
-            <i data-lucide="music" class="text-blue-400"></i> 同期用オーディオ設定
+            <i data-lucide="music" class="text-blue-400"></i> 同期再生設定
           </span>
-          <div class="flex items-center gap-2">
-            <input type="file" id="audio-file" accept="audio/*" onchange="loadAudio(event)" class="hidden">
-            <button onclick="document.getElementById('audio-file').click()" class="bg-gray-100/10 hover:bg-gray-100/20 border border-gray-800 text-xs text-white py-2 px-3 rounded flex items-center gap-1.5 transition-colors">
-              <i data-lucide="upload" class="w-3.5 h-3.5"></i> 別ファイルを選択
-            </button>
-            <span id="audio-name" class="text-xs text-gray-500 truncate max-w-[240px]">テスト音源読込中... (test_qowds1.mp3)</span>
+
+          <div class="space-y-3">
+            <div class="flex flex-wrap gap-4 items-end">
+              <label class="flex items-center gap-2 text-sm text-gray-200">
+                <input type="radio" name="playbackMode" value="url" onchange="onPlaybackModeChange('url')"> URLから再生
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-200">
+                <input type="radio" name="playbackMode" value="file" checked onchange="onPlaybackModeChange('file')"> 動画/音楽ファイル
+              </label>
+              <div class="flex-1 min-w-[200px]">
+                <label class="block text-xs font-bold mb-1 text-gray-500">コンテンツ</label>
+                <input type="text" id="media-url-input" value="" class="w-full bg-gray-100/10 p-2 rounded border border-gray-800" style="display:none" oninput="onMediaUrlChange(this.value)">
+                <div class="flex gap-2 items-center">
+                  <input type="file" id="media-file-input" accept="audio/*,video/*" class="w-full rounded bg-gray-100/10 text-sm text-gray-200" onchange="onFileChange(this)">
+                  <span id="audio-name" class="text-xs text-gray-500 truncate max-w-[180px]">テスト音源読込中...</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+              <button onclick="handleSyncPlay()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm">同期再生</button>
+              <div class="flex items-center gap-1">
+                <label class="text-xs text-gray-400 whitespace-nowrap">シーク</label>
+                <input type="number" id="seek-seconds" min="0" step="1" value="0" class="w-16 p-1 border border-gray-800 bg-gray-100/10 rounded text-white text-sm" oninput="onSeekChange(this.value)">
+                <span class="text-xs text-gray-400">秒</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <label class="text-xs text-gray-400 whitespace-nowrap">遅延開始</label>
+                <input type="number" id="synced-delay" min="0" step="0.1" value="0" class="w-16 p-1 border border-gray-800 bg-gray-100/10 rounded text-white text-sm" oninput="onDelayChange(this.value)">
+                <span class="text-xs text-gray-400">秒</span>
+              </div>
+            </div>
           </div>
+
+          <div id="youtube-container" class="w-full aspect-video bg-black rounded" style="display:none"></div>
           <audio id="audio-player" class="hidden" ontimeupdate="onAudioTimeUpdate()" src="https://res.cloudinary.com/dbld5kqtz/video/upload/v1779899642/test_qowds1.mp3" crossorigin="anonymous" onerror="onAudioLoadError()"></audio>
+          <div id="media-placeholder" class="text-sm text-gray-400 text-center" style="display:none">URLまたはファイルを指定するとプレビューが表示されます。</div>
         </div>
 
       </div>
@@ -433,6 +461,24 @@ L[01:00.85]青い白いロゴ`;
     let isDraggingSlider = false;
     let isAudioFailed = false; // オーディオの読込失敗フラグ
 
+    // 同期再生設定
+    let seekSeconds = 0;
+    let syncedDelay = 0;
+    let playbackMode = 'file';
+    let mediaUrl = '';
+    let fileUrl = 'https://res.cloudinary.com/dbld5kqtz/video/upload/v1779899642/test_qowds1.mp3';
+    let youtubeApiReady = false, playerRef = null, youtubePlayerReady = false, creatingYouTube = false;
+
+    // YouTube IFrame API の動的ロード
+    if (typeof YT !== 'undefined' && YT.Player) {
+      youtubeApiReady = true;
+    } else if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      window.onYouTubeIframeAPIReady = () => { youtubeApiReady = true; };
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.body.appendChild(tag);
+    }
+
     // AからZまですべての定義済みプレセット
     const VALID_PRESETS = [
       'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
@@ -471,6 +517,9 @@ L[01:00.85]青い白いロゴ`;
 
       // 最初の描画
       draw();
+
+      // メディア表示を更新
+      updateMediaDisplay();
     };
 
     // アコーディオン開閉
@@ -763,35 +812,28 @@ L[01:00.85]青い白いロゴ`;
     }
 
     // オーディオファイルのロード
-    function loadAudio(event) {
-      const file = event.target.files[0];
+    function onFileChange(input) {
+      const file = input.files?.[0] || null;
       if (file) {
         isAudioFailed = false;
         audioName.classList.remove("text-amber-400");
         audioName.classList.add("text-gray-500");
         audioName.innerText = file.name;
         const objectURL = URL.createObjectURL(file);
-        
-        const wasPlaying = isPlaying;
-        if (isPlaying) {
-          pausePlayback();
-        }
-
+        if (isPlaying) pausePlayback();
+        if (fileUrl && fileUrl.startsWith('blob:')) URL.revokeObjectURL(fileUrl);
+        fileUrl = objectURL;
         audioPlayer.src = objectURL;
         audioPlayer.load();
-
         audioPlayer.onloadedmetadata = function() {
           duration = audioPlayer.duration;
           seekSlider.max = duration;
           currentTime = 0;
           updateUI();
           draw();
-
-          if (wasPlaying) {
-            togglePlay();
-          }
         };
       }
+      updateMediaDisplay();
     }
 
     function onAudioTimeUpdate() {
@@ -1668,6 +1710,112 @@ L[01:00.85]青い白いロゴ`;
       }
 
       ctx.restore();
+    }
+
+    // 同期再生設定の関数
+    function parseYouTubeId(url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.hostname.includes('youtu.be')) return parsed.pathname.slice(1);
+        if (parsed.hostname.includes('youtube.com')) return parsed.searchParams.get('v');
+        return null;
+      } catch { return null; }
+    }
+
+    function showMediaPlayer(isYouTube) {
+      document.getElementById('youtube-container').style.display = isYouTube ? '' : 'none';
+      document.getElementById('media-placeholder').style.display = (!isYouTube && !fileUrl) ? '' : 'none';
+    }
+
+    function updateMediaDisplay() {
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(mediaUrl);
+      if (isYouTube) {
+        showMediaPlayer(true);
+        if (youtubeApiReady) ensureYouTubePlayer();
+      } else if (fileUrl) {
+        showMediaPlayer(false);
+      } else {
+        showMediaPlayer(false);
+      }
+    }
+
+    function onPlaybackModeChange(mode) {
+      playbackMode = mode;
+      document.getElementById('media-url-input').style.display = mode === 'url' ? '' : 'none';
+      document.getElementById('media-file-input').style.display = mode === 'file' ? '' : 'none';
+      if (mode === 'file' && playerRef) {
+        try { playerRef.destroy(); } catch(e) {} playerRef = null; youtubePlayerReady = false; creatingYouTube = false;
+      }
+      updateMediaDisplay();
+    }
+
+    function onMediaUrlChange(url) {
+      mediaUrl = url;
+      if (playerRef) { try { playerRef.destroy(); } catch(e) {} playerRef = null; youtubePlayerReady = false; }
+      creatingYouTube = false;
+      document.getElementById('youtube-container').innerHTML = '';
+      updateMediaDisplay();
+    }
+
+    function ensureYouTubePlayer() {
+      return new Promise((resolve) => {
+        const videoId = parseYouTubeId(mediaUrl);
+        if (!videoId) { resolve(false); return; }
+        if (playerRef && youtubePlayerReady) { resolve(true); return; }
+        if (creatingYouTube) {
+          const check = () => {
+            if (creatingYouTube) { setTimeout(check, 100); return; }
+            resolve(!!(playerRef && youtubePlayerReady));
+          };
+          check(); return;
+        }
+        if (playerRef) { try { playerRef.destroy(); } catch(e) {} playerRef = null; }
+        document.getElementById('youtube-container').innerHTML = '';
+        creatingYouTube = true;
+        const tryCreate = () => {
+          if (!youtubeApiReady || typeof YT === 'undefined') { setTimeout(tryCreate, 100); return; }
+          playerRef = new YT.Player('youtube-container', {
+            width: '100%', height: '100%', videoId,
+            playerVars: { rel: 0, modestbranding: 1, controls: 1, disablekb: 1 },
+            events: {
+              onReady: () => { youtubePlayerReady = true; creatingYouTube = false; resolve(true); },
+              onStateChange: () => {},
+            },
+          });
+        };
+        if (youtubeApiReady && typeof YT !== 'undefined') { tryCreate(); }
+        else {
+          const wait = () => {
+            if (youtubeApiReady && typeof YT !== 'undefined') { tryCreate(); }
+            else { setTimeout(wait, 100); }
+          };
+          wait();
+        }
+      });
+    }
+
+    function onSeekChange(value) {
+      seekSeconds = parseFloat(value) || 0;
+    }
+
+    function onDelayChange(value) {
+      syncedDelay = parseFloat(value) || 0;
+    }
+
+    function handleSyncPlay() {
+      const isYouTube = playbackMode === 'url' && parseYouTubeId(mediaUrl);
+      if (isYouTube) {
+        if (!playerRef || !youtubePlayerReady) return;
+        playerRef.seekTo(seekSeconds, true);
+        playerRef.playVideo();
+        return;
+      }
+      if (!audioPlayer) return;
+      pausePlayback();
+      seekTo(seekSeconds);
+      setTimeout(() => {
+        togglePlay();
+      }, syncedDelay * 1000);
     }
 
     // ショートカットイベント
