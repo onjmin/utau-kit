@@ -9,12 +9,17 @@
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
 
     <div class="max-w-3xl mx-auto bg-white/50 backdrop-blur-sm border border-gray-300 rounded-2xl p-6 md:p-8">
-        <header class="mb-8">
+        <header class="mb-6">
             <h1 class="text-2xl font-bold mb-2">🎤 つくよみちゃんMML 歌詞付与ツール</h1>
             <p class="text-gray-500 text-sm">全チャンネルの和音を単音化し、@0チャンネルを歌唱用に変換します。</p>
         </header>
 
-        <div class="space-y-6">
+        <div class="flex gap-1 mb-6 border-b border-gray-300">
+            <button id="tabMode1" onclick="switchMode(1)" class="px-4 py-2 text-sm font-semibold rounded-t-lg transition -mb-px border border-transparent border-b-0 text-gray-500 hover:text-gray-700">MML歌詞付与</button>
+            <button id="tabMode2" onclick="switchMode(2)" class="px-4 py-2 text-sm font-semibold rounded-t-lg transition -mb-px border border-transparent border-b-0 text-gray-500 hover:text-gray-700">ひらがな → MML</button>
+        </div>
+
+        <div id="mode1" class="space-y-6">
             <div>
                 <label class="block text-sm font-semibold mb-2">MMLメロディ</label>
                 <textarea id="mmlInput" class="w-full h-32 p-4 bg-gray-100/10 border border-gray-300 rounded-xl focus:ring-2 outline-none transition" placeholder="例: @0 t130 ..."></textarea>
@@ -53,6 +58,44 @@
             <div class="mt-8 pt-8 border-t border-gray-300">
                 <label class="block text-sm font-semibold mb-2">生成されたMML</label>
                 <textarea id="output" readonly class="w-full h-48 p-4 bg-gray-100/10 border border-gray-300 rounded-xl outline-none font-mono text-sm"></textarea>
+            </div>
+        </div>
+
+        <div id="mode2" class="space-y-6 hidden">
+            <div>
+                <label class="block text-sm font-semibold mb-2">ひらがな入力</label>
+                <textarea id="hiraInput" class="w-full h-32 p-4 bg-gray-100/10 border border-gray-300 rounded-xl focus:ring-2 outline-none transition" placeholder="例: なんねんまえかのこ">なんねん、まえ！？かのこ(笑)</textarea>
+                <p class="text-xs text-gray-400 mt-1">漢字・カタカナ・英数字・記号・絵文字は無視されます。</p>
+            </div>
+
+            <div class="flex gap-4">
+                <button id="convertBtn" onclick="convertHiragana()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition">
+                    変換
+                </button>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-sm font-semibold">生成されたMML</label>
+                    <button onclick="copyHiraOutput()" class="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">コピー</button>
+                </div>
+                <pre id="hiraOutput" class="w-full min-h-24 p-4 bg-gray-100/10 border border-gray-300 rounded-xl font-mono text-sm whitespace-pre-wrap break-all"></pre>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">解析結果</label>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border border-gray-300 p-2 text-left">かな</th>
+                                <th class="border border-gray-300 p-2 text-left">子音</th>
+                                <th class="border border-gray-300 p-2 text-left">母音</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analysisBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -115,6 +158,20 @@
         function getVoiceReplacement() {
             const el = document.querySelector('input[name="voice"]:checked');
             return el?.value === 'tyc' ? "@'utau:tyc'" : "@'utau:klatt'";
+        }
+
+        function switchMode(n) {
+            document.getElementById('mode1').classList.toggle('hidden', n !== 1);
+            document.getElementById('mode2').classList.toggle('hidden', n !== 2);
+            [1, 2].forEach(i => {
+                const btn = document.getElementById('tabMode' + i);
+                btn.classList.toggle('bg-white', i === n);
+                btn.classList.toggle('border-gray-300', i === n);
+                btn.classList.toggle('text-gray-900', i === n);
+                btn.classList.toggle('bg-transparent', i !== n);
+                btn.classList.toggle('border-transparent', i !== n);
+                btn.classList.toggle('text-gray-500', i !== n);
+            });
         }
 
         function processMML() {
@@ -186,6 +243,100 @@
             document.getElementById('lyricsInput').value = '';
             document.getElementById('output').value = '';
         }
+
+        const kanaTable = {
+            "あ":["","a"],"い":["","i"],"う":["","u"],"え":["","e"],"お":["","o"],
+            "か":["k","a"],"き":["k","i"],"く":["k","u"],"け":["k","e"],"こ":["k","o"],
+            "さ":["s","a"],"し":["sh","i"],"す":["s","u"],"せ":["s","e"],"そ":["s","o"],
+            "た":["t","a"],"ち":["ch","i"],"つ":["ts","u"],"て":["t","e"],"と":["t","o"],
+            "な":["n","a"],"に":["n","i"],"ぬ":["n","u"],"ね":["n","e"],"の":["n","o"],
+            "は":["h","a"],"ひ":["h","i"],"ふ":["f","u"],"へ":["h","e"],"ほ":["h","o"],
+            "ま":["m","a"],"み":["m","i"],"む":["m","u"],"め":["m","e"],"も":["m","o"],
+            "や":["y","a"],"ゆ":["y","u"],"よ":["y","o"],
+            "ら":["r","a"],"り":["r","i"],"る":["r","u"],"れ":["r","e"],"ろ":["r","o"],
+            "わ":["w","a"],"を":["w","o"],
+            "が":["g","a"],"ぎ":["g","i"],"ぐ":["g","u"],"げ":["g","e"],"ご":["g","o"],
+            "ざ":["z","a"],"じ":["j","i"],"ず":["z","u"],"ぜ":["z","e"],"ぞ":["z","o"],
+            "だ":["d","a"],"ぢ":["j","i"],"づ":["z","u"],"で":["d","e"],"ど":["d","o"],
+            "ば":["b","a"],"び":["b","i"],"ぶ":["b","u"],"べ":["b","e"],"ぼ":["b","o"],
+            "ぱ":["p","a"],"ぴ":["p","i"],"ぷ":["p","u"],"ぺ":["p","e"],"ぽ":["p","o"],
+            "ん":["N","N"]
+        };
+
+        const notePattern = ["d","d","c","d","e","e","d","e","f","g","a","b"];
+
+        function sanitizeText(text) {
+            return text.normalize("NFKC").replace(/[^\u3041-\u3096ー]/g,"");
+        }
+
+        function normalizeKana(text) {
+            const result = [];
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i], n = text[i + 1];
+                if (n && "ゃゅょ".includes(n)) { result.push(c + n); i++; }
+                else { result.push(c); }
+            }
+            return result;
+        }
+
+        function kanaToVowel(kana) {
+            if (/[ゃ]/.test(kana)) return "a";
+            if (/[ゅ]/.test(kana)) return "u";
+            if (/[ょ]/.test(kana)) return "o";
+            if (/[あかさたなはまやらわがざだばぱ]/.test(kana)) return "a";
+            if (/[いきしちにひみりぎじぢびぴ]/.test(kana)) return "i";
+            if (/[うくすつぬふむゆるぐずづぶぷ]/.test(kana)) return "u";
+            if (/[えけせてねへめれげぜでべぺ]/.test(kana)) return "e";
+            if (/[おこそとのほもよろごぞどぼぽ]/.test(kana)) return "o";
+            return "";
+        }
+
+        function analyzeKana(kana) {
+            if (kana === "ー") return { kana, consonant: "-", vowel: "-" };
+            if (kana === "っ") return { kana, consonant: "Q", vowel: "" };
+            if (kana.length === 2) {
+                const row = kanaTable[kana[0]];
+                return { kana, consonant: row ? row[0] : "", vowel: kanaToVowel(kana[1]) || "" };
+            }
+            const row = kanaTable[kana];
+            return row ? { kana, consonant: row[0], vowel: row[1] } : { kana, consonant: "", vowel: "" };
+        }
+
+        function generateMML(text) {
+            const kanaList = normalizeKana(sanitizeText(text));
+            let mml = "t135 @'utau:tyc' q50 v100 o4 ";
+            kanaList.forEach((kana, i) => {
+                mml += `${notePattern[i % notePattern.length]}8'${kana}' `;
+            });
+            return mml.trim();
+        }
+
+        function renderAnalysis(data) {
+            const tbody = document.getElementById('analysisBody');
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'even:bg-gray-50';
+                tr.innerHTML = `<td class="border border-gray-300 p-2">${item.kana}</td><td class="border border-gray-300 p-2">${item.consonant}</td><td class="border border-gray-300 p-2">${item.vowel}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function convertHiragana() {
+            const raw = document.getElementById('hiraInput').value;
+            const text = sanitizeText(raw);
+            const kanaList = normalizeKana(text);
+            const analysis = kanaList.map(analyzeKana);
+            renderAnalysis(analysis);
+            document.getElementById('hiraOutput').textContent = generateMML(text);
+        }
+
+        function copyHiraOutput() {
+            const text = document.getElementById('hiraOutput').textContent;
+            navigator.clipboard.writeText(text);
+        }
+
+        switchMode(1);
     </script>
 </body>
 </html>
