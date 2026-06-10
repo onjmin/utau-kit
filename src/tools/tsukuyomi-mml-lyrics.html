@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>つくよみちゃんMML歌詞付与ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-3xl mx-auto bg-white/50 backdrop-blur-sm border border-gray-300 rounded-2xl p-6 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-2xl font-bold mb-2">🎤 つくよみちゃんMML 歌詞付与ツール</h1>
+            <p class="text-gray-500 text-sm">全チャンネルの和音を単音化し、@0チャンネルを歌唱用に変換します。</p>
+        </header>
+
+        <div class="space-y-6">
+            <div>
+                <label class="block text-sm font-semibold mb-2">MMLメロディ</label>
+                <textarea id="mmlInput" class="w-full h-32 p-4 bg-gray-100/10 border border-gray-300 rounded-xl focus:ring-2 outline-none transition" placeholder="例: @0 t130 ..."></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">歌詞（モーラ単位）</label>
+                <textarea id="lyricsInput" class="w-full h-24 p-4 bg-gray-100/10 border border-gray-300 rounded-xl focus:ring-2 outline-none transition" placeholder="例: いくいくいく"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">歌声の種類</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="voice" value="klatt" checked
+                            class="accent-gray-800 w-4 h-4">
+                        <span class="text-sm">軽量ロボ声 (@'utau:klatt')</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="voice" value="tyc"
+                            class="accent-gray-800 w-4 h-4">
+                        <span class="text-sm">つくよみちゃん (@'utau:tyc')</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button onclick="processMML()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition">
+                    歌詞を付与する
+                </button>
+                <button onclick="clearAll()" class="px-6 py-3 bg-gray-200 hover:bg-gray-300 rounded-xl transition">
+                    クリア
+                </button>
+            </div>
+
+            <div class="mt-8 pt-8 border-t border-gray-300">
+                <label class="block text-sm font-semibold mb-2">生成されたMML</label>
+                <textarea id="output" readonly class="w-full h-48 p-4 bg-gray-100/10 border border-gray-300 rounded-xl outline-none font-mono text-sm"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function splitIntoMoras(text) {
+            const smallKana = /[ゃゅょャュョ]/;
+            const moras = [];
+            let cur = '';
+            for (const ch of text) {
+                if (smallKana.test(ch) && cur) {
+                    cur += ch;
+                } else {
+                    if (cur) moras.push(cur);
+                    cur = ch;
+                }
+            }
+            if (cur) moras.push(cur);
+            return moras;
+        }
+
+        function tokenize(mml) {
+            const tokens = [];
+            let i = 0;
+            while (i < mml.length) {
+                const char = mml[i];
+                if (char === '[') {
+                    let j = i, depth = 0;
+                    while (j < mml.length) {
+                        if (mml[j] === '[') depth++;
+                        if (mml[j] === ']') depth--;
+                        if (depth === 0) break;
+                        j++;
+                    }
+                    let block = mml.substring(i, j + 1);
+                    i = j + 1;
+                    while (i < mml.length && /[\d\.\&]/.test(mml[i])) {
+                        block += mml[i++];
+                    }
+                    tokens.push({ type: 'CHORD', value: block });
+                } else if (/[a-gr]/i.test(char)) {
+                    let note = char;
+                    i++;
+                    while (i < mml.length && /[#+\-\d\.\&]/.test(mml[i])) {
+                        note += mml[i++];
+                    }
+                    tokens.push({ type: 'NOTE', value: note });
+                } else {
+                    let cmd = char;
+                    i++;
+                    while (i < mml.length && /[a-z@\d\.:\-_']/i.test(mml[i]) && !/[a-gr\[]/i.test(mml[i])) {
+                        cmd += mml[i++];
+                    }
+                    tokens.push({ type: 'COMMAND', value: cmd });
+                }
+            }
+            return tokens;
+        }
+
+        function getVoiceReplacement() {
+            const el = document.querySelector('input[name="voice"]:checked');
+            return el?.value === 'tyc' ? "@'utau:tyc'" : "@'utau:klatt'";
+        }
+
+        function processMML() {
+            const mml = document.getElementById('mmlInput').value;
+            const lyrics = splitIntoMoras(document.getElementById('lyricsInput').value.replace(/\s/g, ''));
+            const replaceWith = getVoiceReplacement();
+            
+            const parts = mml.split(';');
+            let lyricIndex = 0;
+
+            const processedLines = parts.map(part => {
+                const tokens = tokenize(part);
+                const isTargetChannel = part.includes('@0');
+
+                const channelMetas = [];
+                const restTokens = [];
+                for (const token of tokens) {
+                    if (token.type === 'COMMAND' && token.value.includes('@0')) {
+                        const meta = token.value.replace('@0', replaceWith);
+                        channelMetas.push(meta);
+                    } else {
+                        restTokens.push(token);
+                    }
+                }
+
+                const tempoIndex = restTokens.findIndex(t =>
+                    t.type === 'COMMAND' && /^\s*t\d+/i.test(t.value)
+                );
+                const finalTokens = [...restTokens];
+                if (channelMetas.length) {
+                    const insertAt = tempoIndex >= 0 ? tempoIndex + 1 : 0;
+                    const items = channelMetas.map((m, i) =>
+                        insertAt === 0 && i === 0 ? m : ' ' + m
+                    );
+                    finalTokens.splice(insertAt, 0, ...items);
+                }
+
+                const processedTokens = finalTokens.map(token => {
+                    if (typeof token === 'string') return token;
+
+                    if (token.type === 'CHORD') {
+                        const inside = token.value.substring(1, token.value.lastIndexOf(']'));
+                        const duration = token.value.substring(token.value.lastIndexOf(']') + 1);
+                        const firstNoteMatch = inside.match(/[cdefgabr][#+-]?/i);
+                        let noteBase = (firstNoteMatch ? firstNoteMatch[0] : 'c') + duration;
+
+                        if (isTargetChannel && !noteBase.toLowerCase().startsWith('r') && lyricIndex < lyrics.length) {
+                            return noteBase + "'" + lyrics[lyricIndex++] + "'";
+                        }
+                        return noteBase;
+                    }
+
+                    if (token.type === 'NOTE') {
+                        if (isTargetChannel && !token.value.toLowerCase().startsWith('r') && lyricIndex < lyrics.length) {
+                            return token.value + "'" + lyrics[lyricIndex++] + "'";
+                        }
+                    }
+                    return token.value;
+                });
+                return processedTokens.join('');
+            });
+
+            // #mml ヘッダーをつけ、改行区切りで出力
+            document.getElementById('output').value = "#mml\n" + processedLines.join('\n');
+        }
+
+        function clearAll() {
+            document.getElementById('mmlInput').value = '';
+            document.getElementById('lyricsInput').value = '';
+            document.getElementById('output').value = '';
+        }
+    </script>
+</body>
+</html>
