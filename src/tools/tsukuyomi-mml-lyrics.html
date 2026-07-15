@@ -101,12 +101,14 @@
     </div>
 
     <script>
+        // 直前の文字と結合して1音節を成す「小さいかな」（ぁぃぅぇぉゃゅょっ を含む）
+        const SMALL_KANA = "ぁぃぅぇぉゃゅょっ";
+
         function splitIntoMoras(text) {
-            const smallKana = /[ゃゅょャュョ]/;
             const moras = [];
             let cur = '';
             for (const ch of text) {
-                if (smallKana.test(ch) && cur) {
+                if (SMALL_KANA.includes(ch) && cur) {
                     cur += ch;
                 } else {
                     if (cur) moras.push(cur);
@@ -174,17 +176,31 @@
             });
         }
 
+        // #inst=... #drum=... #volume=... 等のハッシュオプションを除去する
+        function stripHashOptions(line) {
+            return line.replace(/#[a-zA-Z_][a-zA-Z0-9_]*=[^\s]*/g, '').replace(/\s+/g, ' ').trim();
+        }
+
         function processMML() {
-            const mml = document.getElementById('mmlInput').value;
+            const mmlRaw = document.getElementById('mmlInput').value;
             const lyrics = splitIntoMoras(document.getElementById('lyricsInput').value.replace(/\s/g, ''));
-            const replaceWith = getVoiceReplacement();
-            
+            const voiceVal = document.querySelector('input[name="voice"]:checked')?.value;
+
+            // つくよみちゃん: @'utau:tyc' の前に t120 v15 を付与する形式
+            // klatt: @'utau:klatt' そのまま
+            const replaceWith = voiceVal === 'tyc' ? "t120 v15 @'utau:tyc'" : "@'utau:klatt'";
+
+            // ハッシュオプションを先に除去
+            const mml = mmlRaw.split('\n').map(stripHashOptions).join('\n');
+
             const parts = mml.split(';');
             let lyricIndex = 0;
 
             const processedLines = parts.map(part => {
-                const tokens = tokenize(part);
-                const isTargetChannel = part.includes('@0');
+                // ハッシュオプションがセミコロン区切りで来た場合も除去
+                const cleanPart = stripHashOptions(part);
+                const tokens = tokenize(cleanPart);
+                const isTargetChannel = cleanPart.includes('@0');
 
                 const channelMetas = [];
                 const restTokens = [];
@@ -234,8 +250,8 @@
                 return processedTokens.join('');
             });
 
-            // #mml ヘッダーをつけ、改行区切りで出力
-            document.getElementById('output').value = "#mml\n" + processedLines.join('\n');
+            // #mml ヘッダーをつけ、改行区切りで出力（空行は除去）
+            document.getElementById('output').value = "#mml\n" + processedLines.filter(l => l.trim()).join('\n');
         }
 
         function clearAll() {
@@ -273,7 +289,8 @@
             const result = [];
             for (let i = 0; i < text.length; i++) {
                 const c = text[i], n = text[i + 1];
-                if (n && "ゃゅょ".includes(n)) { result.push(c + n); i++; }
+                // ぁぃぅぇぉゃゅょっ すべての小文字かなを直前の文字と結合する
+                if (n && SMALL_KANA.includes(n)) { result.push(c + n); i++; }
                 else { result.push(c); }
             }
             return result;
@@ -304,7 +321,7 @@
 
         function generateMML(text) {
             const kanaList = normalizeKana(sanitizeText(text));
-            let mml = "t135 @'utau:tyc' q50 v100 o4 ";
+            let mml = "t120 v15 @'utau:tyc' q50 o4 ";
             kanaList.forEach((kana, i) => {
                 mml += `${notePattern[i % notePattern.length]}8'${kana}' `;
             });
