@@ -176,9 +176,9 @@
             });
         }
 
-        // #inst=... #drum=... #volume=... 等のハッシュオプションを除去する
-        function stripHashOptions(line) {
-            return line.replace(/#[a-zA-Z_][a-zA-Z0-9_]*=[^\s]*/g, '').replace(/\s+/g, ' ').trim();
+        // #inst=... #drum=... #volume=... 等のハッシュオプションを除去する（#から;が終わるまで、または行末まで）
+        function stripHashOptions(text) {
+            return text.replace(/#[a-zA-Z_][a-zA-Z0-9_]*=[^;\r\n]*(?:;|$)/g, '').trim();
         }
 
         function processMML() {
@@ -191,14 +191,14 @@
             const replaceWith = voiceVal === 'tyc' ? "t120 v15 @'utau:tyc'" : "@'utau:klatt'";
 
             // ハッシュオプションを先に除去
-            const mml = mmlRaw.split('\n').map(stripHashOptions).join('\n');
+            const mml = stripHashOptions(mmlRaw);
 
             const parts = mml.split(';');
             let lyricIndex = 0;
 
             const processedLines = parts.map(part => {
-                // ハッシュオプションがセミコロン区切りで来た場合も除去
-                const cleanPart = stripHashOptions(part);
+                const cleanPart = part.trim();
+                if (!cleanPart) return '';
                 const tokens = tokenize(cleanPart);
                 const isTargetChannel = cleanPart.includes('@0');
 
@@ -250,8 +250,8 @@
                 return processedTokens.join('');
             });
 
-            // #mml ヘッダーをつけ、改行区切りで出力（空行は除去）
-            document.getElementById('output').value = "#mml\n" + processedLines.filter(l => l.trim()).join('\n');
+            // #mml ヘッダーをつけ、トラックごとに空行を挟んで出力（空行は除去）
+            document.getElementById('output').value = "#mml\n\n" + processedLines.filter(l => l.trim()).join('\n\n');
         }
 
         function clearAll() {
