@@ -157,6 +157,60 @@
             return tokens;
         }
 
+        // つくよみちゃん用: ノート末尾に極小の休符を挟むための長さ分割
+        // 全音符を UNIT 分割の整数単位で扱い、末尾 1 単位分（極小）を休符に回し、
+        // 残りをタイで繋いだ音符として出力することで、合計の長さ（タイミング）は変えない。
+        const TINY_REST_UNIT_BASE = 1024;
+
+        function computeTotalUnits(durStr, UNIT) {
+            if (!durStr) return null; // 長さ省略（lコマンド依存）は非対応のため分割しない
+            const comps = durStr.split('&');
+            let total = 0;
+            for (const c of comps) {
+                const m = c.match(/^(\d+)(\.*)$/);
+                if (!m) return null; // 数値以外を含む記法は非対応
+                const n = parseInt(m[1], 10);
+                if (n <= 0 || UNIT % n !== 0) return null; // 2の累乗以外の分母は非対応
+                let units = UNIT / n;
+                let add = units;
+                let dotUnits = units;
+                for (let d = 0; d < m[2].length; d++) {
+                    if (dotUnits % 2 !== 0) return null;
+                    dotUnits = dotUnits / 2;
+                    add += dotUnits;
+                }
+                total += add;
+            }
+            return total;
+        }
+
+        function unitsToDenoms(units, UNIT) {
+            const denoms = [];
+            let remaining = units;
+            let bit = UNIT;
+            while (bit >= 1) {
+                if (remaining >= bit) {
+                    denoms.push(UNIT / bit);
+                    remaining -= bit;
+                }
+                bit = bit / 2;
+            }
+            return denoms;
+        }
+
+        function splitNoteWithTinyRest(letter, durStr) {
+            const UNIT = TINY_REST_UNIT_BASE;
+            const total = computeTotalUnits(durStr, UNIT);
+            if (total === null || total <= 1) return null; // 分割不可、または短すぎる
+            const restUnits = 1; // 極小の休符（1/1024拍相当）
+            const noteUnits = total - restUnits;
+            const noteDenoms = unitsToDenoms(noteUnits, UNIT);
+            const restDenoms = unitsToDenoms(restUnits, UNIT);
+            const noteStr = letter + noteDenoms.map((d, i) => i === 0 ? String(d) : '&' + d).join('');
+            const restStr = restDenoms.map(d => 'r' + d).join('');
+            return { noteStr, restStr };
+        }
+
         function getVoiceReplacement() {
             const el = document.querySelector('input[name="voice"]:checked');
             return el?.value === 'tyc' ? "@'utau:tyc'" : "@'utau:klatt'";
@@ -232,17 +286,31 @@
                         const inside = token.value.substring(1, token.value.lastIndexOf(']'));
                         const duration = token.value.substring(token.value.lastIndexOf(']') + 1);
                         const firstNoteMatch = inside.match(/[cdefgabr][#+-]?/i);
-                        let noteBase = (firstNoteMatch ? firstNoteMatch[0] : 'c') + duration;
+                        const letter = firstNoteMatch ? firstNoteMatch[0] : 'c';
+                        let noteBase = letter + duration;
 
                         if (isTargetChannel && !noteBase.toLowerCase().startsWith('r') && lyricIndex < lyrics.length) {
-                            return noteBase + "'" + lyrics[lyricIndex++] + "'";
+                            const lyric = lyrics[lyricIndex++];
+                            if (voiceVal === 'tyc') {
+                                const split = splitNoteWithTinyRest(letter, duration);
+                                if (split) return split.noteStr + "'" + lyric + "'" + split.restStr;
+                            }
+                            return noteBase + "'" + lyric + "'";
                         }
                         return noteBase;
                     }
 
                     if (token.type === 'NOTE') {
                         if (isTargetChannel && !token.value.toLowerCase().startsWith('r') && lyricIndex < lyrics.length) {
-                            return token.value + "'" + lyrics[lyricIndex++] + "'";
+                            const lyric = lyrics[lyricIndex++];
+                            if (voiceVal === 'tyc') {
+                                const letterMatch = token.value.match(/^[a-g][#+-]?/i);
+                                const letter = letterMatch ? letterMatch[0] : token.value[0];
+                                const durStr = token.value.slice(letter.length);
+                                const split = splitNoteWithTinyRest(letter, durStr);
+                                if (split) return split.noteStr + "'" + lyric + "'" + split.restStr;
+                            }
+                            return token.value + "'" + lyric + "'";
                         }
                     }
                     return token.value;
